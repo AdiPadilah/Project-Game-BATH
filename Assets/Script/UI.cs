@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -40,7 +40,48 @@ public class UI : MonoBehaviour
     {
         if (player == null)
             player = FindFirstObjectByType<Player>();
+
+        SetupHUDLayout();
     }
+
+    private void SetupHUDLayout()
+    {
+        // Hanya sembunyikan background cyan InGame_Timer (image tanpa sprite = cyan by default)
+        // timerText → Timer_Background → InGame_Timer  (2 level ke atas)
+        if (timerText != null)
+        {
+            Transform timerContainer = (timerText.transform.parent != null)
+                ? timerText.transform.parent.parent
+                : null;
+            if (timerContainer != null)
+            {
+                Image timerBg = timerContainer.GetComponent<Image>();
+                if (timerBg != null)
+                    timerBg.color = new Color(0f, 0f, 0f, 0f); // transparent
+            }
+        }
+
+        // Perbaiki anchor InGame_KillCount ke pojok kanan atas
+        // killCountText → KillCOunt_Background → InGame_KillCount  (2 level ke atas)
+        if (killCountText != null)
+        {
+            Transform killContainer = (killCountText.transform.parent != null)
+                ? killCountText.transform.parent.parent
+                : null;
+            if (killContainer != null)
+            {
+                RectTransform kr = killContainer.GetComponent<RectTransform>();
+                if (kr != null)
+                {
+                    kr.anchorMin = new Vector2(1f, 1f);
+                    kr.anchorMax = new Vector2(1f, 1f);
+                    kr.pivot     = new Vector2(1f, 1f);
+                    // Jangan ubah sizeDelta atau anchoredPosition — biarkan posisi asli dari scene
+                }
+            }
+        }
+    }
+
 
     private void Update()
     {

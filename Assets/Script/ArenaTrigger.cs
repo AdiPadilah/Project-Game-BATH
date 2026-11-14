@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class ArenaTrigger : MonoBehaviour
 {
@@ -40,7 +40,6 @@ public class ArenaTrigger : MonoBehaviour
         {
             arenaCleared = true;
             OpenWalls();
-            ResetArena();
         }
     }
 

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class MenuManager : MonoBehaviour
 {
@@ -8,12 +8,16 @@ public class MenuManager : MonoBehaviour
    
     public void OpenAbout()
     {
-        aboutPanel.SetActive(true);
+        if (aboutPanel != null)
+            aboutPanel.SetActive(true);
+        else
+            Debug.LogWarning("AboutPanel belum di-assign di Inspector!");
     }
 
    
     public void CloseAbout()
     {
-        aboutPanel.SetActive(false);
+        if (aboutPanel != null)
+            aboutPanel.SetActive(false);
     }
 }

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class Enemy_Respawner : MonoBehaviour
 {
@@ -48,11 +48,14 @@ public class Enemy_Respawner : MonoBehaviour
 
     void SpawnWave()
     {
+        if (enemyPrefab == null || spawnPoints == null || spawnPoints.Length == 0) return;
+
         int spawnAmount = Mathf.Min(spawnPerWave, totalEnemiesToSpawn - spawnedCount);
 
         for (int i = 0; i < spawnAmount; i++)
         {
             Transform randomPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+            if (randomPoint == null) continue;
             GameObject enemy = Instantiate(enemyPrefab, randomPoint.position, Quaternion.identity);
 
             spawnedCount++;
@@ -65,6 +68,7 @@ public class Enemy_Respawner : MonoBehaviour
     public void EnemyDied()
     {
         aliveCount--;
+        if (aliveCount < 0) aliveCount = 0;
     }
 
     public void StartFight()

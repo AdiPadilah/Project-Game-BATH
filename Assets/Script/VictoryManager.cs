@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
@@ -135,7 +135,7 @@ public class VictoryManager : MonoBehaviour
     public void KeHome()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene("Home");
+        SceneManager.LoadScene("Main Menu");
     }
 
     public void KeNext()

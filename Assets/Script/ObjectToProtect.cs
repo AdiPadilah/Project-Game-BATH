@@ -15,8 +15,12 @@ public class ObjectToProtect : Entity
 
     protected override void Update()
     {
-        base.Update(); // ?? penting biar sistem health & collision tetap jalan
-        HandleFlip();
+        base.Update();
+    }
+
+    protected override void HandleAnimations()
+    {
+        // Object to protect tidak memiliki parameter animator
     }
 
     protected override void HandleFlip()

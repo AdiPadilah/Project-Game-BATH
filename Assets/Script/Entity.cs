@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 public class Entity : MonoBehaviour
@@ -27,6 +27,7 @@ public class Entity : MonoBehaviour
 
     protected bool isInvincible;
     private Coroutine damageCoroutine;
+    protected Material defaultMaterial;
 
     [Header("Attack")]
     [SerializeField] protected int attackDamage = 10;
@@ -50,6 +51,11 @@ public class Entity : MonoBehaviour
         col = GetComponent<Collider2D>();
         anim = GetComponentInChildren<Animator>();
         sr = GetComponentInChildren<SpriteRenderer>();
+
+        if (sr != null)
+        {
+            defaultMaterial = sr.material;
+        }
 
         // Logika agar darah penuh saat game pertama kali dijalankan
         if (currentHealth <= 0)
@@ -134,10 +140,13 @@ public class Entity : MonoBehaviour
 
     private IEnumerator DamageFlash()
     {
-        Material original = sr.material;
+        if (defaultMaterial == null && sr != null)
+            defaultMaterial = sr.material;
+
         sr.material = damagedMaterial;
         yield return new WaitForSeconds(damageFeedbackDuration);
-        sr.material = original;
+        if (sr != null && defaultMaterial != null)
+            sr.material = defaultMaterial;
     }
 
     public void EnableMovement(bool enable) => canMove = enable;
@@ -165,7 +174,7 @@ public class Entity : MonoBehaviour
         transform.localScale = scale;
     }
 
-    protected void HandleAnimations()
+    protected virtual void HandleAnimations()
     {
         if (anim == null || rb == null) return;
         anim.SetFloat("xVelocity", Mathf.Abs(rb.velocity.x));
@@ -173,7 +182,7 @@ public class Entity : MonoBehaviour
         anim.SetBool("isGrounded", isGrounded);
     }
 
-    public void DamageTargets()
+    public virtual void DamageTargets()
     {
         if (UI.instance != null && UI.instance.isGameOver) return;
         if (entityAttackPoint == null) return;

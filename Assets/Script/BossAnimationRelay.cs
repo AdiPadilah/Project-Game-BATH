@@ -48,7 +48,6 @@ public class BossAnimationRelay : MonoBehaviour
     {
         if (UI.instance != null && UI.instance.isGameOver)
         {
-            Debug.Log("🛑 Relay dimatikan");
             enabled = false;
         }
     }

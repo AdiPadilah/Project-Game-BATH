@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 
@@ -42,6 +42,7 @@ public class BossAI : Entity
     private bool isTakingDamage = false;
     private bool frozenOnGameOver = false;
     private Color originalColor;
+    private Coroutine attackTimeoutCoroutine; // Track attack coroutine terpisah agar tidak cancel HitRoutine
 
     protected override void Awake()
     {
@@ -81,14 +82,18 @@ public class BossAI : Entity
 
         attackTimer += Time.deltaTime;
 
-        float distanceToPlayer = Vector2.Distance(transform.position, player.position);
+        float hDistance = Mathf.Abs(player.position.x - transform.position.x);
+        float vDistance = Mathf.Abs(player.position.y - transform.position.y);
         float dir = player.position.x - transform.position.x;
 
-        // Flip logic menggunakan bossScale
-        if (dir > 0.1f)
-            transform.localScale = new Vector3(-bossScale, bossScale, 1f);
-        else if (dir < -0.1f)
-            transform.localScale = new Vector3(bossScale, bossScale, 1f);
+        // Flip logic menggunakan bossScale (hanya saat tidak sedang menyerang)
+        if (!isAttacking)
+        {
+            if (dir > 0.1f)
+                transform.localScale = new Vector3(-bossScale, bossScale, 1f);
+            else if (dir < -0.1f)
+                transform.localScale = new Vector3(bossScale, bossScale, 1f);
+        }
 
         if (isAttacking)
         {
@@ -96,27 +101,28 @@ public class BossAI : Entity
             return;
         }
 
-        if (entityAttackPoint == null) return;
+        Collider2D hitPlayer = null;
+        if (entityAttackPoint != null)
+        {
+            hitPlayer = Physics2D.OverlapCircle(
+                entityAttackPoint.position,
+                attackRange,
+                playerLayer
+            );
+        }
 
-        Collider2D hitPlayer = Physics2D.OverlapCircle(
-            entityAttackPoint.position,
-            attackRange,
-            playerLayer
-        );
+        // Cek jangkauan serang secara horizontal & vertikal agar saat player berada di bawah boss langsung diserang (bukan joging)
+        bool inRangeToAttack = (hitPlayer != null) || (hDistance <= attackRange && vDistance <= 4.0f);
 
-        if (hitPlayer != null)
+        if (inRangeToAttack)
         {
             Stop();
             if (attackTimer >= attackCooldown)
                 Attack();
         }
-        else if (distanceToPlayer > stopDistance)
-        {
-            MoveToPlayer(dir);
-        }
         else
         {
-            Stop();
+            MoveToPlayer(dir);
         }
     }
 
@@ -159,21 +165,26 @@ public class BossAI : Entity
             anim.SetBool("isMoving", false);
             anim.SetTrigger("Cleave");
 
-            StopAllCoroutines();
-            StartCoroutine(AttackTimeout(2.5f));
+            // Animasi Cleave berdurasi ~1.1 detik, beri timeout 1.1 detik agar boss tidak macet/freeze
+            if (attackTimeoutCoroutine != null)
+                StopCoroutine(attackTimeoutCoroutine);
+            attackTimeoutCoroutine = StartCoroutine(AttackTimeout(1.1f));
         }
     }
 
     IEnumerator AttackTimeout(float duration)
     {
-        yield return new WaitForSecondsRealtime(duration);
+        yield return new WaitForSeconds(duration);
         isAttacking = false;
+        attackTimer = 0f;
     }
 
     public void EndAttack()
     {
         isAttacking = false;
         attackTimer = 0f;
+        if (attackTimeoutCoroutine != null)
+            StopCoroutine(attackTimeoutCoroutine);
     }
 
     public void DealDamage()
@@ -192,6 +203,11 @@ public class BossAI : Entity
             Entity p = hitPlayer.GetComponent<Entity>();
             if (p != null) p.TakeDamage(damage);
         }
+        else if (player != null && Vector2.Distance(transform.position, player.position) <= attackRange + 1.5f)
+        {
+            Entity p = player.GetComponent<Entity>();
+            if (p != null) p.TakeDamage(damage);
+        }
     }
 
     public override void TakeDamage(int dmg)
@@ -203,6 +219,10 @@ public class BossAI : Entity
             audioSource.PlayOneShot(hitSound);
 
         isTakingDamage = true;
+        isAttacking = false; // Batalkan status attack agar boss tidak stuck setelah kena hit
+        if (attackTimeoutCoroutine != null)
+            StopCoroutine(attackTimeoutCoroutine);
+
         currentHealth -= dmg;
 
         // Update UI Slider saat kena damage
@@ -234,14 +254,23 @@ public class BossAI : Entity
         if (isDead) return;
         isDead = true;
 
+        // Hentikan semua coroutine aktif (HitRoutine, AttackTimeout) agar tidak konflik
+        StopAllCoroutines();
+        isAttacking = false;
+        isKnocked = false;
+        isTakingDamage = false;
+
         if (audioSource != null && deathSound != null)
             audioSource.PlayOneShot(deathSound);
 
         if (anim != null)
             anim.SetTrigger("Die");
 
-        rb.velocity = Vector2.zero;
-        rb.simulated = false;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.simulated = false;
+        }
 
         StartCoroutine(MunculkanVictoryPanel());
         Destroy(gameObject, 5f);
@@ -268,6 +297,12 @@ public class BossAI : Entity
 
     void MoveToPlayer(float dir)
     {
+        if (Mathf.Abs(dir) < 0.1f)
+        {
+            Stop();
+            return;
+        }
+
         float move = Mathf.Sign(dir);
         rb.velocity = new Vector2(move * moveSpeed, rb.velocity.y);
         if (anim != null) anim.SetBool("isMoving", true);

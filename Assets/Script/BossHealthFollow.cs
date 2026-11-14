@@ -7,7 +7,11 @@ public class BossHealthFollow : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
 
         // Ambil posisi target (boss)
         Vector3 targetPos = target.position + offset;

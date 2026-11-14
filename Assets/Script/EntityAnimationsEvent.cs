@@ -11,7 +11,7 @@ public class EntityAnimationsEvent : MonoBehaviour
         entity = GetComponentInParent<Entity>();
     }
 
-    public void DamageTargets() => entity.DamageTargets();
-    private void DisableMovementAndJump() => entity.EnableMovement(false);
-    private void EnableMovementAndJump() => entity.EnableMovement(true);
+    public void DamageTargets() => entity?.DamageTargets();
+    private void DisableMovementAndJump() => entity?.EnableMovement(false);
+    private void EnableMovementAndJump() => entity?.EnableMovement(true);
 }

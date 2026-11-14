@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using System.Collections;
+using UnityEngine;
 using UnityEngine.UI;
 
 public class Player : Entity
@@ -7,9 +8,28 @@ public class Player : Entity
     [SerializeField] private float moveSpeed = 8f; // Kecepatan gerak
     [SerializeField] private float jumpForce = 12f; // Kekuatan lompat
 
-    [Header("Attack")]
-    [SerializeField] private float attackCooldown = 0.4f;
-    private float lastAttackTime;
+    [Header("Dash")]
+    [SerializeField] private float dashSpeed = 16f; // Kecepatan dash
+    [SerializeField] private float dashDuration = 0.25f; // Durasi dash (detik)
+    [SerializeField] private float dashCooldown = 0.5f; // Cooldown antar dash
+    [SerializeField] private AudioClip dashSound; // Efek suara dash
+    private bool isDashing = false;
+    private float lastDashTime = -999f;
+
+    [Header("Attack & Combo")]
+    [SerializeField] private float attackCooldown = 0.35f;
+    [SerializeField] private float comboWindowTime = 0.6f; // Jendela waktu untuk tekan tombol combo berikutnya
+    [SerializeField] private AudioClip[] comboHitSounds; // Suara ekstra untuk combo finisher
+    [SerializeField] private GameObject swordGlowEffect; // Slot jika ada object glow manual
+    [SerializeField] private Color swordGlowColor = new Color(1f, 0.85f, 0.2f, 1f); // Warna emas bersinar
+
+    private float lastAttackTime = -999f;
+    private float lastAttackEndTime = -999f;
+    private int currentComboStep = 0; // 0=none, 1=atk1, 2=atk2, 3=atk3, 4=combo finisher
+    private bool isAttacking = false;
+    private bool comboQueued = false;
+    private bool hasHitEnemyInCombo = false; // HARUS kena musuh agar bisa masuk combo finisher!
+    private Light dynamicSwordLight;
 
     [SerializeField] private float attackRange = 2f;
     [SerializeField] private LayerMask enemyLayer;
@@ -29,6 +49,7 @@ public class Player : Entity
     private float xInput;
     private bool isDead = false;
     private bool wasGrounded;
+    private bool justJumped; // Flag untuk mencegah suara lompat bunyi 2 kali
 
     protected override void Awake()
     {
@@ -39,12 +60,25 @@ public class Player : Entity
             healthSlider.maxValue = maxHealth;
             healthSlider.value = currentHealth;
         }
+
+        // Inisialisasi cahaya pedang emas dinamis untuk efek kombo
+        if (entityAttackPoint != null)
+        {
+            GameObject lightObj = new GameObject("SwordGlowLight");
+            lightObj.transform.SetParent(entityAttackPoint, false);
+            dynamicSwordLight = lightObj.AddComponent<Light>();
+            dynamicSwordLight.type = LightType.Point;
+            dynamicSwordLight.color = swordGlowColor;
+            dynamicSwordLight.range = 4f;
+            dynamicSwordLight.intensity = 2.5f;
+            dynamicSwordLight.enabled = false;
+        }
     }
 
     protected override void Update()
     {
         // Berhenti jika sudah mati atau game over
-        if (isDead || UI.instance == null || UI.instance.isGameOver)
+        if (isDead || (UI.instance != null && UI.instance.isGameOver))
             return;
 
         if (!sudahMenang)
@@ -61,11 +95,55 @@ public class Player : Entity
     {
         xInput = Input.GetAxisRaw("Horizontal");
 
+        // Deteksi Dash: Panah Kanan + D atau Panah Kiri + D
+        bool dDown = Input.GetKeyDown(KeyCode.D);
+        bool dHeld = Input.GetKey(KeyCode.D);
+        bool rightDown = Input.GetKeyDown(KeyCode.RightArrow);
+        bool leftDown = Input.GetKeyDown(KeyCode.LeftArrow);
+        bool rightHeld = Input.GetKey(KeyCode.RightArrow);
+        bool leftHeld = Input.GetKey(KeyCode.LeftArrow);
+
+        bool triggerDash = false;
+        float dashDir = 0f;
+
+        if (dDown)
+        {
+            triggerDash = true;
+            if (rightHeld || xInput > 0.1f)
+                dashDir = 1f;
+            else if (leftHeld || xInput < -0.1f)
+                dashDir = -1f;
+            else
+                dashDir = facingRight ? 1f : -1f;
+        }
+        else if (dHeld)
+        {
+            if (rightDown)
+            {
+                triggerDash = true;
+                dashDir = 1f;
+            }
+            else if (leftDown)
+            {
+                triggerDash = true;
+                dashDir = -1f;
+            }
+        }
+
+        if (triggerDash && !isDashing && Time.time >= lastDashTime + dashCooldown)
+        {
+            StartCoroutine(DashRoutine(dashDir));
+            return;
+        }
+
+        if (isDashing) return;
+
         // Lompat menggunakan Space
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             rb.velocity = new Vector2(rb.velocity.x, jumpForce);
             PlayJumpSound();
+            justJumped = true; // Tandai agar HandleJumpFallSound tidak bunyi lagi
         }
 
         // Serang menggunakan Panah Atas
@@ -77,10 +155,18 @@ public class Player : Entity
 
     private void HandleJumpFallSound()
     {
-        if (wasGrounded && !isGrounded)
+        if (isDashing)
+        {
+            wasGrounded = isGrounded;
+            return;
+        }
+
+        // Hanya bunyi jika player jatuh dari tepi (bukan dari lompat manual)
+        if (wasGrounded && !isGrounded && !justJumped)
         {
             PlayJumpSound();
         }
+        justJumped = false; // Reset flag setiap frame
         wasGrounded = isGrounded;
     }
 
@@ -95,54 +181,257 @@ public class Player : Entity
 
     private void TryAttack()
     {
-        if (Time.time < lastAttackTime + attackCooldown)
-            return;
+        if (isDashing || isDead) return;
 
-        lastAttackTime = Time.time;
-
-        if (anim != null)
-            anim.SetTrigger("attack");
-
-        PlayAttackSound();
-    }
-
-    private void PlayAttackSound()
-    {
-        if (audioSource != null && hitSounds.Length > 0)
+        // Jika sedang dalam animasi serangan, antrikan input serangan berikutnya
+        if (isAttacking)
         {
-            AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
-            float volume = Random.Range(0.8f, 1f);
-            audioSource.PlayOneShot(clip, volume);
+            comboQueued = true;
+            return;
+        }
+
+        // Cek apakah combo chain masih aktif (dalam window waktu setelah serangan sebelumnya)
+        if (Time.time <= lastAttackEndTime + comboWindowTime && currentComboStep > 0)
+        {
+            AdvanceCombo();
+        }
+        else
+        {
+            // Reset ke Serangan 1 (Vertikal)
+            if (Time.time >= lastAttackTime + attackCooldown)
+            {
+                currentComboStep = 0;
+                hasHitEnemyInCombo = false;
+                AdvanceCombo();
+            }
         }
     }
 
-    public void DealDamage()
+    private void AdvanceCombo()
     {
-        if (UI.instance != null && UI.instance.isGameOver)
-            return;
+        if (currentComboStep == 0)
+        {
+            // Step 1: Tebas Vertikal
+            currentComboStep = 1;
+            hasHitEnemyInCombo = false; // Reset deteksi hit saat mulai rantai baru
+            StartCoroutine(ExecuteAttackRoutine(1, "attack1", 0.40f));
+        }
+        else if (currentComboStep == 1)
+        {
+            // Step 2: Tebas Kiri
+            currentComboStep = 2;
+            StartCoroutine(ExecuteAttackRoutine(2, "attack2", 0.40f));
+        }
+        else if (currentComboStep == 2)
+        {
+            // Step 3: Tebas Kanan
+            currentComboStep = 3;
+            StartCoroutine(ExecuteAttackRoutine(3, "attack3", 0.40f));
+        }
+        else if (currentComboStep == 3)
+        {
+            // Step 4: Combo Finisher?
+            // HANYA BISA KELUAR JIKA SERANGAN SEBELUMNYA KENA MUSUH!
+            if (hasHitEnemyInCombo)
+            {
+                currentComboStep = 4;
+                StartCoroutine(ExecuteAttackRoutine(4, "attackCombo", 0.85f));
+            }
+            else
+            {
+                // Tidak kena musuh: tidak bisa masuk combo finisher, kembali ke Step 1
+                currentComboStep = 1;
+                hasHitEnemyInCombo = false;
+                StartCoroutine(ExecuteAttackRoutine(1, "attack1", 0.40f));
+            }
+        }
+        else
+        {
+            // Selesai step 4, kembali ke step 1
+            currentComboStep = 1;
+            hasHitEnemyInCombo = false;
+            StartCoroutine(ExecuteAttackRoutine(1, "attack1", 0.40f));
+        }
+    }
 
+    private IEnumerator ExecuteAttackRoutine(int step, string triggerName, float duration)
+    {
+        isAttacking = true;
+        comboQueued = false;
+        lastAttackTime = Time.time;
+
+        // Berhenti bergerak saat mulai menebas (tidak bisa menyerang sambil lari)
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(0f, rb.velocity.y);
+        }
+
+        if (anim != null)
+        {
+            anim.ResetTrigger("attack1");
+            anim.ResetTrigger("attack2");
+            anim.ResetTrigger("attack3");
+            anim.ResetTrigger("attackCombo");
+            anim.SetTrigger(triggerName);
+        }
+
+        PlayAttackSoundForStep(step);
+
+        // Jika Step 4 (Combo Finisher): AKTIFKAN EFEK PEDANG MENYALA EMAS!
+        if (step == 4)
+        {
+            SetSwordGlow(true);
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Matikan efek pedang menyala setelah combo finisher selesai
+        if (step == 4)
+        {
+            SetSwordGlow(false);
+            currentComboStep = 0;
+            hasHitEnemyInCombo = false;
+        }
+
+        lastAttackEndTime = Time.time;
+        isAttacking = false;
+
+        // Jika pemain menekan tombol saat animasi masih berlangsung, langsung jalankan combo berikutnya!
+        if (comboQueued && !isDead && !isDashing && currentComboStep > 0)
+        {
+            comboQueued = false;
+            AdvanceCombo();
+        }
+    }
+
+    private void SetSwordGlow(bool active)
+    {
+        if (dynamicSwordLight != null)
+        {
+            dynamicSwordLight.enabled = active;
+        }
+        if (swordGlowEffect != null)
+        {
+            swordGlowEffect.SetActive(active);
+        }
+        if (sr != null)
+        {
+            sr.color = active ? new Color(1.2f, 1.1f, 0.6f, 1f) : Color.white;
+        }
+    }
+
+    private void PlayAttackSoundForStep(int step)
+    {
+        if (audioSource == null) return;
+        AudioClip[] pool = (step == 4 && comboHitSounds != null && comboHitSounds.Length > 0)
+            ? comboHitSounds : hitSounds;
+        if (pool != null && pool.Length > 0)
+        {
+            AudioClip clip = pool[Random.Range(0, pool.Length)];
+            audioSource.PlayOneShot(clip, Random.Range(0.85f, 1f));
+        }
+    }
+
+    public override void DamageTargets()
+    {
+        if (UI.instance != null && UI.instance.isGameOver) return;
         if (entityAttackPoint == null) return;
 
-        Collider2D[] hits = Physics2D.OverlapCircleAll(
-            entityAttackPoint.position,
-            attackRange,
-            enemyLayer
-        );
-
-        foreach (Collider2D hit in hits)
+        Collider2D[] targets = Physics2D.OverlapCircleAll(entityAttackPoint.position, attackRange, enemyLayer);
+        foreach (Collider2D target in targets)
         {
-            Entity enemy = hit.GetComponent<Entity>();
-            if (enemy != null)
+            Entity enemy = target.GetComponent<Entity>();
+            if (enemy != null && enemy != this)
             {
-                enemy.TakeDamage(10);
+                // Musuh kena! Kunci terbuka untuk combo finisher!
+                hasHitEnemyInCombo = true;
+
+                // Damage seimbang: tidak langsung membuat musuh mati seketika
+                int damage = 3;
+                if (currentComboStep == 1) damage = 3;
+                else if (currentComboStep == 2) damage = 4;
+                else if (currentComboStep == 3) damage = 5;
+                else if (currentComboStep == 4) damage = 4; // Multi-hit tebasan mutilasi (total ~16 damage)
+
+                enemy.TakeDamage(damage);
             }
         }
     }
 
     protected override void HandleMovement()
     {
-        if (!canMove || isDead) return;
+        if (!canMove || isDead || isDashing) return;
+
+        // Player tidak boleh bergerak saat sedang menyerang (tidak boleh nyerang sambil lari)
+        if (isAttacking)
+        {
+            rb.velocity = new Vector2(0f, rb.velocity.y);
+            return;
+        }
+
         rb.velocity = new Vector2(xInput * moveSpeed, rb.velocity.y);
+    }
+
+    private IEnumerator DashRoutine(float direction)
+    {
+        isDashing = true;
+        canMove = false;
+        isInvincible = true;
+        lastDashTime = Time.time;
+
+        // Hadapkan player ke arah dash jika belum menghadap ke sana
+        if (direction > 0 && !facingRight)
+        {
+            Flip();
+        }
+        else if (direction < 0 && facingRight)
+        {
+            Flip();
+        }
+
+        // Trigger animasi Dash di Animator
+        if (anim != null)
+        {
+            anim.SetTrigger("dash");
+        }
+
+        // Putar suara Dash (whoosh)
+        PlayDashSound();
+
+        // Nonaktifkan gravitasi sementara agar gerak dash lurus & konsisten
+        float originalGravity = rb != null ? rb.gravityScale : 1f;
+        if (rb != null)
+        {
+            rb.gravityScale = 0f;
+            rb.velocity = new Vector2(direction * dashSpeed, 0f);
+        }
+
+        yield return new WaitForSeconds(dashDuration);
+
+        // Kembalikan gravitasi dan kurangi momentum secara mulus
+        if (rb != null)
+        {
+            rb.gravityScale = originalGravity;
+            rb.velocity = new Vector2(rb.velocity.x * 0.3f, rb.velocity.y);
+        }
+
+        isDashing = false;
+        canMove = true;
+        isInvincible = false;
+    }
+
+    private void PlayDashSound()
+    {
+        AudioClip clip = dashSound != null ? dashSound : jumpSound;
+        if (audioSource != null && clip != null)
+        {
+            audioSource.PlayOneShot(clip, 0.9f);
+        }
     }
 
     protected override void OnHealthChanged()
@@ -159,8 +448,19 @@ public class Player : Entity
         if (isDead) return;
 
         isDead = true;
+        isDashing = false;
+        isAttacking = false;
+        currentComboStep = 0;
+        hasHitEnemyInCombo = false;
+        SetSwordGlow(false);
+        canMove = false;
+        StopAllCoroutines();
         rb.velocity = Vector2.zero;
         rb.simulated = false; // Mencegah player jatuh ke bawah terus
+
+        // Matikan collider agar tidak terkena damage lagi
+        if (col != null)
+            col.enabled = false;
 
         // Putar suara mati dari slot yang kamu isi (Dark Souls Sound)
         if (deathSound != null)
@@ -175,7 +475,10 @@ public class Player : Entity
             anim.SetTrigger("Die");
         }
 
-        base.Die();
+        // CATATAN: Tidak memanggil base.Die() karena:
+        // - base.Die() akan SetTrigger("Die") lagi (double trigger)
+        // - base.Die() akan lempar player ke atas (rb.velocity = (0,8))
+        // - base.Die() akan Destroy(gameObject, 2f) → player hilang sebelum Game Over tampil
 
         // Munculkan panel Game Over
         if (UI.instance != null)

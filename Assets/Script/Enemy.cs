@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 public class Enemy : Entity
@@ -33,6 +33,23 @@ public class Enemy : Entity
         {
             healthSlider.maxValue = maxHealth;
             healthSlider.value = currentHealth;
+
+            // Hilangkan offset bawaan Unity Slider agar fill bisa benar-benar mencapai 0 tanpa sisa setetes
+            if (healthSlider.fillRect != null)
+            {
+                healthSlider.fillRect.sizeDelta = Vector2.zero;
+                healthSlider.fillRect.anchoredPosition = Vector2.zero;
+            }
+            Transform fillArea = healthSlider.transform.Find("Fill Area");
+            if (fillArea != null)
+            {
+                RectTransform faRT = fillArea.GetComponent<RectTransform>();
+                if (faRT != null)
+                {
+                    faRT.sizeDelta = Vector2.zero;
+                    faRT.anchoredPosition = Vector2.zero;
+                }
+            }
         }
 
         Player foundPlayer = FindFirstObjectByType<Player>();
@@ -44,7 +61,7 @@ public class Enemy : Entity
     {
         if (UI.instance != null && UI.instance.isGameOver)
         {
-            rb.velocity = Vector2.zero;
+            if (rb != null) rb.velocity = Vector2.zero;
             if (anim != null)
                 anim.SetFloat("Velocity", 0);
             return;
@@ -60,12 +77,31 @@ public class Enemy : Entity
         base.Update();
     }
 
+    protected override void HandleAnimations()
+    {
+        if (anim == null) return;
+        anim.SetFloat("xVelocity", Mathf.Abs(rb != null ? rb.velocity.x : 0));
+    }
+
     protected override void OnHealthChanged()
     {
         if (healthSlider != null)
-            healthSlider.value = currentHealth;
-
-        // Suara hit dihilangkan agar fokus ke death sound
+        {
+            healthSlider.value = Mathf.Max(0, currentHealth);
+            if (currentHealth <= 0)
+            {
+                healthSlider.value = 0;
+                if (healthSlider.fillRect != null)
+                    healthSlider.fillRect.gameObject.SetActive(false);
+                healthSlider.gameObject.SetActive(false);
+            }
+            else
+            {
+                if (healthSlider.fillRect != null)
+                    healthSlider.fillRect.gameObject.SetActive(true);
+                healthSlider.gameObject.SetActive(true);
+            }
+        }
     }
 
     protected override void HandleMovement()
@@ -138,7 +174,9 @@ public class Enemy : Entity
 
     protected override void Die()
     {
-        // MAIN KAN SUARA MATI SEBELUM BASE.DIE()
+        canMove = false;
+
+        // Mainkan suara mati
         if (audioSource != null && deathSound != null)
         {
             audioSource.PlayOneShot(deathSound);
@@ -150,6 +188,26 @@ public class Enemy : Entity
         if (respawner != null)
             respawner.EnemyDied();
 
-        base.Die();
+        if (healthSlider != null)
+        {
+            healthSlider.value = 0;
+            if (healthSlider.fillRect != null)
+                healthSlider.fillRect.gameObject.SetActive(false);
+            healthSlider.gameObject.SetActive(false);
+        }
+
+        if (anim != null)
+            anim.SetTrigger("Die");
+
+        if (col != null)
+            col.enabled = false;
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.gravityScale = 0f;
+        }
+
+        Destroy(gameObject, 1.2f);
     }
 }

@@ -1,15 +1,14 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
-using Unity.VisualScripting.Antlr3.Runtime;
 using UnityEngine;
 using UnityEngine.Audio;
 using UnityEngine.UI;
-using UnityEngine.UIElements;
+// CATATAN: Dihapus 'using Unity.VisualScripting.Antlr3.Runtime' (library internal, tidak ada di build)
+// CATATAN: Dihapus 'using UnityEngine.UIElements' (konflik namespace dengan UnityEngine.UI)
 
 public class SettingsMenu : MonoBehaviour
 {
-    [SerializeField]  AudioMixer audioMixer;
+    [SerializeField] AudioMixer audioMixer;
 
     public TMPro.TMP_Dropdown resolutionDropdown;
 
@@ -17,6 +16,13 @@ public class SettingsMenu : MonoBehaviour
 
     private void Start()
     {
+        // Guard: jika dropdown tidak diassign, skip
+        if (resolutionDropdown == null)
+        {
+            Debug.LogWarning("SettingsMenu: resolutionDropdown belum di-assign di Inspector!");
+            return;
+        }
+
         resolutions = Screen.resolutions;
 
         resolutionDropdown.ClearOptions();
@@ -29,7 +35,7 @@ public class SettingsMenu : MonoBehaviour
             string option = resolutions[i].width + " x " + resolutions[i].height + " @ " + resolutions[i].refreshRateRatio + "hz";
             options.Add(option);
 
-            if (resolutions[i].width == Screen.currentResolution.width && 
+            if (resolutions[i].width == Screen.currentResolution.width &&
                 resolutions[i].height == Screen.currentResolution.height)
             {
                 currentResolutionIndex = i;
@@ -41,25 +47,30 @@ public class SettingsMenu : MonoBehaviour
         resolutionDropdown.RefreshShownValue();
     }
 
-    public void setResolution (int resolutionIndex)
+    public void setResolution(int resolutionIndex)
     {
+        if (resolutions == null || resolutionIndex < 0 || resolutionIndex >= resolutions.Length) return;
         Resolution resolution = resolutions[resolutionIndex];
         Screen.SetResolution(resolution.width, resolution.height, Screen.fullScreen);
     }
 
     public void SetVolume(float volume)
     {
+        if (audioMixer == null)
+        {
+            Debug.LogWarning("SettingsMenu: AudioMixer belum di-assign di Inspector!");
+            return;
+        }
         audioMixer.SetFloat("Master Volume", volume);
     }
 
-    public void SetQuality (float qualityIndex)
+    public void SetQuality(float qualityIndex)
     {
         int qi = Mathf.RoundToInt(qualityIndex);
-
         QualitySettings.SetQualityLevel(qi);
     }
 
-    public void SetFullscreen (bool isFullscreen)
+    public void SetFullscreen(bool isFullscreen)
     {
         Screen.fullScreen = isFullscreen;
     }

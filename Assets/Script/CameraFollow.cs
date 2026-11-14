@@ -10,6 +10,11 @@ public class CameraFollow : MonoBehaviour
     void Start()
     {
         fixedY = transform.position.y; // simpan posisi Y awal
+        if (target == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) target = p.transform;
+        }
     }
 
     void LateUpdate()
