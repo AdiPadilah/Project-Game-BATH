@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Auto-reload Main Menu scene dari disk setiap kali keluar Play Mode.
-/// Pasang script ini sekali di Assets/Editor/ — tidak perlu hapus.
+/// Juga ada menu manual: Tools > RELOAD MAIN MENU
 /// </summary>
 [InitializeOnLoad]
 public static class ForceReloadMenu
@@ -12,22 +12,34 @@ public static class ForceReloadMenu
     static ForceReloadMenu()
     {
         EditorApplication.playModeStateChanged += OnModeChanged;
-        // Juga reload sekali saat Unity startup / compile ulang
         EditorApplication.delayCall += TryReload;
     }
 
     static void OnModeChanged(PlayModeStateChange state)
     {
-        // Saat baru keluar dari Play Mode → reload scene dari disk
         if (state == PlayModeStateChange.EnteredEditMode)
         {
-            EditorApplication.delayCall += TryReload;
+            // Tunggu 2 frame agar Unity selesai restore dari backup
+            EditorApplication.delayCall += () =>
+                EditorApplication.delayCall += TryReload;
         }
     }
 
-    static void TryReload()
+    [MenuItem("Tools/RELOAD MAIN MENU DARI DISK")]
+    public static void TryReload()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning("[ForceReloadMenu] Stop Play Mode dulu!");
+            return;
+        }
+
+        // Tandai scene tidak perlu disave (buang perubahan dari 0.backup)
+        var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        if (activeScene.isDirty)
+        {
+            EditorSceneManager.MarkSceneDirty(activeScene);
+        }
 
         try
         {
@@ -36,7 +48,7 @@ public static class ForceReloadMenu
         }
         catch (System.Exception ex)
         {
-            Debug.LogWarning("[ForceReloadMenu] Gagal reload: " + ex.Message);
+            Debug.LogError("[ForceReloadMenu] GAGAL reload: " + ex.Message);
         }
     }
 }
