@@ -23,7 +23,7 @@ public class Player : Entity
     [SerializeField] private Color swordGlowColor = new Color(1f, 0.85f, 0.2f, 1f); // Warna emas bersinar
 
     [Header("Combo Audio")]
-    [SerializeField] private AudioClip comboFinisherImpactSound; // Suara impact saat kombo kena musuh (opsional)
+    // Tidak ada field tambahan — kombo pakai hitSounds yang sama dengan basic attack
 
     private float lastAttackTime = -999f;
     private float lastAttackEndTime = -999f;
@@ -76,14 +76,7 @@ public class Player : Entity
             dynamicSwordLight.enabled = false;
         }
 
-        // Auto-assign comboFinisherImpactSound dari asset yang sudah ada
-        if (comboFinisherImpactSound == null)
-        {
-#if UNITY_EDITOR
-            comboFinisherImpactSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(
-                "Assets/Sound/yodguard-a-massive-axe-impact-hitting-metal-4-450252.mp3");
-#endif
-        }
+        // Tidak ada auto-load tambahan — hitSounds diisi dari Inspector
     }
 
     protected override void Update()
@@ -389,13 +382,12 @@ public class Player : Entity
                 else if (currentComboStep == 4)
                 {
                     damage = 4; // Multi-hit tebasan mutilasi (total ~16 damage)
-
-                    // Efek suara dentuman berat saat eksekusi kombo mengenai musuh!
-                    if (audioSource != null && comboFinisherImpactSound != null)
+                    // Suara combo finisher saat kena — pakai hitSounds dengan pitch rendah (berat)
+                    if (audioSource != null && hitSounds != null && hitSounds.Length > 0)
                     {
                         float orig = audioSource.pitch;
-                        audioSource.pitch = Random.Range(0.9f, 1.1f);
-                        audioSource.PlayOneShot(comboFinisherImpactSound, 1.2f);
+                        audioSource.pitch = Random.Range(0.75f, 0.88f); // rendah = berat/impact
+                        audioSource.PlayOneShot(hitSounds[Random.Range(0, hitSounds.Length)], 1.1f);
                         audioSource.pitch = orig;
                     }
                 }
