@@ -47,6 +47,15 @@ public class Player : Entity
     [Header("UI")]
     [SerializeField] private Slider healthSlider;
 
+    [Header("Mana / Skill Energy")]
+    [SerializeField] private int maxMana = 100;
+    [SerializeField] private int currentMana = 100;
+
+    public int GetCurrentMana() => currentMana;
+    public int GetMaxMana() => maxMana;
+    public void UseMana(int amount) { currentMana = Mathf.Clamp(currentMana - amount, 0, maxMana); }
+    public void RestoreMana(int amount) { currentMana = Mathf.Clamp(currentMana + amount, 0, maxMana); }
+
     public float waktuMain = 0f;
     public bool sudahMenang = false;
 

@@ -42,43 +42,38 @@ public class UI : MonoBehaviour
             player = FindFirstObjectByType<Player>();
 
         SetupHUDLayout();
+
+        // Pastikan PlayerHUD Dark Fantasy aktif (Avatar portrait + Bar HP Ruby + Bar Mana Safir)
+        if (GetComponent<PlayerHUD>() == null)
+        {
+            gameObject.AddComponent<PlayerHUD>();
+        }
     }
 
     private void SetupHUDLayout()
     {
-        // Hanya sembunyikan background cyan InGame_Timer (image tanpa sprite = cyan by default)
-        // timerText → Timer_Background → InGame_Timer  (2 level ke atas)
+        // Sembunyikan Timer dan KillCount dari gameplay agar layar bersih & sinematik
+        // Waktu tetap dihitung di background lewat player.waktuMain untuk bintang di layar kemenangan
         if (timerText != null)
         {
             Transform timerContainer = (timerText.transform.parent != null)
                 ? timerText.transform.parent.parent
                 : null;
             if (timerContainer != null)
-            {
-                Image timerBg = timerContainer.GetComponent<Image>();
-                if (timerBg != null)
-                    timerBg.color = new Color(0f, 0f, 0f, 0f); // transparent
-            }
+                timerContainer.gameObject.SetActive(false);
+            else
+                timerText.gameObject.SetActive(false);
         }
 
-        // Perbaiki anchor InGame_KillCount ke pojok kanan atas
-        // killCountText → KillCOunt_Background → InGame_KillCount  (2 level ke atas)
         if (killCountText != null)
         {
             Transform killContainer = (killCountText.transform.parent != null)
                 ? killCountText.transform.parent.parent
                 : null;
             if (killContainer != null)
-            {
-                RectTransform kr = killContainer.GetComponent<RectTransform>();
-                if (kr != null)
-                {
-                    kr.anchorMin = new Vector2(1f, 1f);
-                    kr.anchorMax = new Vector2(1f, 1f);
-                    kr.pivot     = new Vector2(1f, 1f);
-                    // Jangan ubah sizeDelta atau anchoredPosition — biarkan posisi asli dari scene
-                }
-            }
+                killContainer.gameObject.SetActive(false);
+            else
+                killCountText.gameObject.SetActive(false);
         }
     }
 

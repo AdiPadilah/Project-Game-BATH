@@ -24,57 +24,10 @@ public class PlayerHealthUI : MonoBehaviour
 
     void Start()
     {
-        // Pastikan Canvas Scaler ScaleWithScreenSize agar HP bar tidak terlempar keluar layar pada resolusi apapun
+        // Sembunyikan slider lama karena digantikan oleh PlayerHUD bergaya Dark Fantasy
         if (slider != null)
         {
-            CanvasScaler cs = slider.GetComponentInParent<CanvasScaler>();
-            if (cs != null && cs.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize)
-            {
-                cs.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                cs.referenceResolution = new Vector2(1920, 1080);
-                cs.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-                cs.matchWidthOrHeight = 0.5f;
-            }
-
-            // Posisikan Bar HP tepat di bawah box Time dengan ukuran proporsional
-            RectTransform rt = slider.GetComponent<RectTransform>();
-            if (rt != null)
-            {
-                rt.anchorMin = new Vector2(0f, 1f);
-                rt.anchorMax = new Vector2(0f, 1f);
-                rt.pivot = new Vector2(0f, 1f);
-                rt.localScale = Vector3.one;
-                rt.sizeDelta = new Vector2(280f, 18f);
-                rt.anchoredPosition = new Vector2(40f, -90f);
-            }
-
-            // Atur Background dan Fill Area agar mengisi penuh tinggi slider sehingga bar tebal dan jelas
-            Transform bg = slider.transform.Find("Background");
-            if (bg != null)
-            {
-                RectTransform bgRT = bg.GetComponent<RectTransform>();
-                if (bgRT != null)
-                {
-                    bgRT.anchorMin = Vector2.zero;
-                    bgRT.anchorMax = Vector2.one;
-                    bgRT.sizeDelta = Vector2.zero;
-                }
-            }
-
-            Transform fillArea = slider.transform.Find("Fill Area");
-            if (fillArea != null)
-            {
-                RectTransform faRT = fillArea.GetComponent<RectTransform>();
-                if (faRT != null)
-                {
-                    faRT.anchorMin = Vector2.zero;
-                    faRT.anchorMax = Vector2.one;
-                    faRT.sizeDelta = Vector2.zero;
-                }
-            }
-
-            slider.maxValue = maxHealth;
-            slider.value = currentHealth;
+            slider.gameObject.SetActive(false);
         }
 
         if (gameOverPanel != null)

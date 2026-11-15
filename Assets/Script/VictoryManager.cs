@@ -89,6 +89,9 @@ public class VictoryManager : MonoBehaviour
         GameObject inGameUI = GameObject.Find("InGame_UI");
         if (inGameUI != null) inGameUI.SetActive(false);
 
+        GameObject playerHud = GameObject.Find("Player_HUD_Frame");
+        if (playerHud != null) playerHud.SetActive(false);
+
         GameObject inGameKill = GameObject.Find("InGame_KillCount");
         if (inGameKill != null) inGameKill.SetActive(false);
 
