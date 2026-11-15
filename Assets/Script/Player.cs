@@ -63,6 +63,7 @@ public class Player : Entity
     private bool isDead = false;
     private bool wasGrounded;
     private bool justJumped; // Flag untuk mencegah suara lompat bunyi 2 kali
+    private float manaRegenTimer = 0f;
 
     protected override void Awake()
     {
@@ -90,6 +91,14 @@ public class Player : Entity
         // Tidak ada auto-load tambahan — hitSounds diisi dari Inspector
     }
 
+    protected virtual void Start()
+    {
+        if (GetComponent<PlayerSkills>() == null)
+        {
+            gameObject.AddComponent<PlayerSkills>();
+        }
+    }
+
     protected override void Update()
     {
         // Berhenti jika sudah mati atau game over
@@ -101,6 +110,14 @@ public class Player : Entity
             waktuMain += Time.deltaTime;
         }
 
+        // Regenerasi mana pasif (3 MP per detik)
+        manaRegenTimer += Time.deltaTime;
+        if (manaRegenTimer >= 1f)
+        {
+            manaRegenTimer = 0f;
+            RestoreMana(3);
+        }
+
         HandleInput();
         HandleJumpFallSound();
         base.Update();
@@ -108,7 +125,12 @@ public class Player : Entity
 
     private void HandleInput()
     {
-        xInput = Input.GetAxisRaw("Horizontal");
+        // Gerakan horizontal: Arrow Keys (Panah Kiri / Kanan) diprioritaskan
+        // agar tombol A tidak menggerakkan player saat menekan Skill 1
+        float rawH = 0f;
+        if (Input.GetKey(KeyCode.RightArrow)) rawH += 1f;
+        if (Input.GetKey(KeyCode.LeftArrow)) rawH -= 1f;
+        xInput = rawH;
 
         // Deteksi Dash: Panah Kanan + D atau Panah Kiri + D
         bool dDown = Input.GetKeyDown(KeyCode.D);
@@ -390,6 +412,9 @@ public class Player : Entity
 
                 // Musuh kena! Kunci terbuka untuk combo finisher!
                 hasHitEnemyInCombo = true;
+
+                // Tambah Mana saat tebasan berhasil mengenai musuh (+8 MP)
+                RestoreMana(8);
 
                 // Player: 20 damage per hit (step 1-3), combo finisher 30 damage (step 4)
                 int damage = 20;

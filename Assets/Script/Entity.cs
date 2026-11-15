@@ -108,6 +108,13 @@ public class Entity : MonoBehaviour
     public int GetCurrentHealth() => currentHealth;
     public int GetMaxHealth() => maxHealth;
 
+    public void SetInvincible(bool val) => isInvincible = val;
+    public bool IsInvincible() => isInvincible;
+    public Rigidbody2D GetRigidbody() => rb;
+    public Animator GetAnimator() => anim;
+    public Transform GetAttackPoint() => entityAttackPoint;
+    public LayerMask GetEnemyLayer() => enemyLayer;
+
     protected virtual void Die()
     {
         canMove = false;
