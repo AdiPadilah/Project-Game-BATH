@@ -15,6 +15,7 @@ public class MainMenu : MonoBehaviour
     private Sprite screenVignette;
     private Sprite fireGlowSprite;
     private Sprite sunsetRaysSprite;
+    private Sprite modalPanelSprite;
 
     private AudioClip sfxHover;
     private AudioClip sfxClick;
@@ -50,6 +51,7 @@ public class MainMenu : MonoBehaviour
         BuildAtmosphere();
         SetupDynamicBackground();
         FixMenuLayout();
+        FixBiodataLayout();
         SpawnFloatingEmbers();
         SpawnDragonMouthSparks();
         SpawnDesertSandWind();
@@ -64,6 +66,7 @@ public class MainMenu : MonoBehaviour
         screenVignette   = Resources.Load<Sprite>("UI/screen_vignette");
         fireGlowSprite   = Resources.Load<Sprite>("UI/fire_glow");
         sunsetRaysSprite = Resources.Load<Sprite>("UI/sunset_rays");
+        modalPanelSprite = Resources.Load<Sprite>("UI/panel_fantasy_modal");
 
         sfxHover         = Resources.Load<AudioClip>("Audio/ui_hover");
         sfxClick         = Resources.Load<AudioClip>("Audio/ui_click");
@@ -127,7 +130,6 @@ public class MainMenu : MonoBehaviour
             if (bgRect != null)
             {
                 bgBasePos = bgRect.anchoredPosition;
-                // Skala 1.10x agar saat drifting & tilt lebih dinamis tidak tampak batas tepi
                 bgRect.localScale = new Vector3(1.10f, 1.10f, 1f);
 
                 // 1. Cahaya api membara di mulut naga
@@ -168,7 +170,7 @@ public class MainMenu : MonoBehaviour
                     sunHaloImg.raycastTarget = false;
                 }
 
-                // 3. Berkas sinar matahari senja (Sunset Godrays)
+                // 3. Berkas sinar matahari sore (Sunset Godrays)
                 if (sunsetRaysSprite != null && bgT.Find("Sunset_Godrays") == null)
                 {
                     GameObject raysGO = new GameObject("Sunset_Godrays");
@@ -202,19 +204,16 @@ public class MainMenu : MonoBehaviour
 
         float t = Time.time;
 
-        // 1. Gerakan terbang dinamis naga (kombinasi ayunan sayap + turbulensi angin)
+        // Gerakan terbang dinamis naga
         float swayX = Mathf.Sin(t * 0.40f) * 26f + Mathf.Sin(t * 1.05f) * 6f;
         float bobY  = Mathf.Cos(t * 0.32f) * 16f + Mathf.Sin(t * 0.85f) * 4f;
 
-        // Zoom bernapas perlahan
         float zoom = 1.10f + Mathf.Sin(t * 0.16f) * 0.025f;
         bgRect.localScale = new Vector3(zoom, zoom, 1f);
 
-        // Sedikit kemiringan (tilt/roll angle) alami saat berbelok di udara
         float rollAngle = Mathf.Sin(t * 0.32f) * 1.6f;
         bgRect.localEulerAngles = new Vector3(0f, 0f, rollAngle);
 
-        // 2. Interactive Mouse Parallax lebih responsif & dinamis
         Vector2 mouseNorm = Vector2.zero;
         if (Screen.width > 0 && Screen.height > 0)
         {
@@ -233,7 +232,6 @@ public class MainMenu : MonoBehaviour
     {
         float t = Time.time;
 
-        // 1. Api di mulut naga berkedip hidup & membara
         if (fireGlowImg != null && fireGlowRect != null)
         {
             float flicker = Mathf.PerlinNoise(t * 6.5f, 0f);
@@ -244,7 +242,6 @@ public class MainMenu : MonoBehaviour
             fireGlowImg.color = new Color(1f, 0.65f, 0.18f, alpha);
         }
 
-        // 2. Halo matahari di langit berdenyut lembut
         if (sunHaloImg != null && sunHaloRect != null)
         {
             float pulse = Mathf.Sin(t * 1.1f) * 0.5f + 0.5f;
@@ -253,22 +250,18 @@ public class MainMenu : MonoBehaviour
             sunHaloImg.color = new Color(1f, 0.85f, 0.45f, 0.18f + pulse * 0.16f);
         }
 
-        // 3. Berkas sinar matahari sore (Sunset Godrays) berkedip & menyapu lembut
         if (sunsetRaysImg != null && sunsetRaysRect != null)
         {
             float rayPulse = Mathf.Sin(t * 0.75f) * 0.5f + 0.5f;
             sunsetRaysImg.color = new Color(1f, 0.85f, 0.45f, 0.18f + rayPulse * 0.18f);
 
-            // Ayunan sudut sinar tipis
             float rayAngle = Mathf.Sin(t * 0.30f) * 2.5f;
             sunsetRaysRect.localEulerAngles = new Vector3(0f, 0f, rayAngle);
         }
 
-        // 4. Perubahan rona hangat langit sore (Sunset Twilight Breathe)
         if (bgImage != null)
         {
             float sunsetBreathe = Mathf.Sin(t * 0.45f) * 0.5f + 0.5f;
-            // Rona keemasan hangat senja
             bgImage.color = Color.Lerp(
                 new Color(1.0f, 0.96f, 0.92f, 1f),
                 new Color(1.0f, 0.88f, 0.82f, 1f),
@@ -376,6 +369,87 @@ public class MainMenu : MonoBehaviour
                 }
             }
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Penataan & Estetika Ornate pada Panel Biodata
+    // ─────────────────────────────────────────────────────────────────────
+    void FixBiodataLayout()
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        Transform optMenu = canvas.transform.Find("Options Menu");
+        if (optMenu == null) return;
+
+        Transform panel = optMenu.Find("Panel");
+        if (panel == null) return;
+
+        // 1. Frame Panel Modal
+        RectTransform panelRt = panel.GetComponent<RectTransform>();
+        if (panelRt != null)
+        {
+            panelRt.anchorMin        = new Vector2(0.5f, 0.5f);
+            panelRt.anchorMax        = new Vector2(0.5f, 0.5f);
+            panelRt.pivot            = new Vector2(0.5f, 0.5f);
+            panelRt.anchoredPosition = Vector2.zero;
+            panelRt.sizeDelta        = new Vector2(760f, 500f);
+        }
+
+        Image panelImg = panel.GetComponent<Image>();
+        if (panelImg != null && modalPanelSprite != null)
+        {
+            panelImg.sprite = modalPanelSprite;
+            panelImg.type   = Image.Type.Sliced;
+            panelImg.color  = Color.white;
+        }
+
+        // 2. Tombol Kembali di dalam Biodata
+        Transform backBtn = panel.Find("Back Button");
+        if (backBtn != null)
+        {
+            RectTransform backRt = backBtn.GetComponent<RectTransform>();
+            if (backRt != null)
+            {
+                backRt.anchorMin        = new Vector2(0.5f, 0f);
+                backRt.anchorMax        = new Vector2(0.5f, 0f);
+                backRt.pivot            = new Vector2(0.5f, 0f);
+                backRt.anchoredPosition = new Vector2(0f, 35f);
+                backRt.sizeDelta        = new Vector2(220f, 48f);
+            }
+
+            Image backImg = backBtn.GetComponent<Image>();
+            if (backImg != null && btnNormal != null)
+            {
+                backImg.sprite = btnNormal;
+                backImg.type   = Image.Type.Sliced;
+                backImg.color  = Color.white;
+            }
+
+            Button btn = backBtn.GetComponent<Button>();
+            if (btn != null)
+            {
+                if (btnHover != null && btnPressed != null)
+                {
+                    btn.transition = Selectable.Transition.SpriteSwap;
+                    SpriteState ss = new SpriteState();
+                    ss.highlightedSprite = btnHover;
+                    ss.pressedSprite     = btnPressed;
+                    ss.selectedSprite    = btnHover;
+                    btn.spriteState      = ss;
+                }
+
+                btn.onClick.RemoveListener(PlayClickSound);
+                btn.onClick.AddListener(PlayClickSound);
+
+                btn.onClick.RemoveListener(kembali);
+                btn.onClick.AddListener(kembali);
+            }
+
+            AddHoverEffect(backBtn.gameObject);
+        }
+
+        Debug.Log("<color=cyan>[MainMenu] Layout Biodata diperindah sempurna!</color>");
     }
 
     void PlayClickSound()
@@ -497,15 +571,11 @@ public class MainMenu : MonoBehaviour
         renderer.sortingOrder = 6;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Efek Angin Badai Pasir Gurun & Debu Berterbangan (Desert Sand Wind)
-    // ─────────────────────────────────────────────────────────────────────
     void SpawnDesertSandWind()
     {
         if (GameObject.Find("Desert_Sand_Wind") != null) return;
 
         GameObject sandGO = new GameObject("Desert_Sand_Wind");
-        // Posisi di sisi kanan layar agar pasir tertiup ke kiri
         sandGO.transform.position = new Vector3(10f, -1.0f, 0f);
 
         ParticleSystem ps = sandGO.AddComponent<ParticleSystem>();
@@ -516,26 +586,23 @@ public class MainMenu : MonoBehaviour
         main.startSpeed      = new ParticleSystem.MinMaxCurve(4.5f, 8.5f);
         main.startSize       = new ParticleSystem.MinMaxCurve(0.02f, 0.07f);
         main.startColor      = new ParticleSystem.MinMaxGradient(
-            new Color(0.92f, 0.74f, 0.42f, 0.70f), // Pasir keemasan gurun
-            new Color(0.78f, 0.50f, 0.22f, 0.45f)  // Debu tanah liat senja
+            new Color(0.92f, 0.74f, 0.42f, 0.70f),
+            new Color(0.78f, 0.50f, 0.22f, 0.45f)
         );
         main.maxParticles    = 70;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.gravityModifier = 0.03f; // Pasir sedikit meluncur ke bawah terbawa gravitasi
+        main.gravityModifier = 0.03f;
 
         var emission = ps.emission;
         emission.rateOverTime = 16f;
 
-        // Emitter garis vertikal tinggi di kanan, menembak kencang ke kiri
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale     = new Vector3(1f, 8.5f, 1f);
-        shape.rotation  = new Vector3(0f, 0f, 172f); // Menghadap ke kiri menyapu ngarai
+        shape.rotation  = new Vector3(0f, 0f, 172f);
 
         var renderer = sandGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 7;
-
-        Debug.Log("<color=yellow>[MainMenu] Efek Angin Pasir Gurun & Langit Senja aktif!</color>");
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -551,7 +618,17 @@ public class MainMenu : MonoBehaviour
 
     public void kembali()
     {
-        SceneManager.LoadScene("Main Menu");
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            Transform opt = canvas.transform.Find("Options Menu");
+            if (opt != null) opt.gameObject.SetActive(false);
+            gameObject.SetActive(true);
+        }
+        else
+        {
+            SceneManager.LoadScene("Main Menu");
+        }
     }
 
     public void Next()
