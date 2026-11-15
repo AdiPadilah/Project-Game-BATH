@@ -6,9 +6,9 @@ public class CameraFollow : MonoBehaviour
     public static CameraFollow instance;
 
     public Transform target;
-    public Transform overrideTarget; // Target cutscene (misal Boss)
+    public Transform overrideTarget;      // Target override saat cutscene
     public float smoothSpeed = 5f;
-    public float cutsceneZoomSize = 5.2f;
+    public float cutsceneZoomSize = 4.0f; // Zoom saat menyorot boss (lebih dekat)
 
     private float fixedY;
     private float defaultOrthographicSize = 8f;
@@ -25,7 +25,7 @@ public class CameraFollow : MonoBehaviour
 
     void Start()
     {
-        fixedY = transform.position.y; // simpan posisi Y awal
+        fixedY = transform.position.y;
         if (target == null)
         {
             GameObject p = GameObject.FindGameObjectWithTag("Player");
@@ -36,35 +36,30 @@ public class CameraFollow : MonoBehaviour
     void LateUpdate()
     {
         Transform currentFollow = overrideTarget != null ? overrideTarget : target;
-        if (currentFollow == null)
-            return;
+        if (currentFollow == null) return;
 
-        // Saat cutscene, kamera bisa sedikit menyesuaikan ketinggian ke arah tubuh boss
-        float targetY = overrideTarget != null ? Mathf.Lerp(fixedY, overrideTarget.position.y + 1.5f, 0.6f) : fixedY;
+        // Saat cutscene boss: ikuti posisi Y boss juga biar lebih dramatis
+        float targetY = overrideTarget != null
+            ? Mathf.Lerp(fixedY, overrideTarget.position.y + 1.0f, 0.65f)
+            : fixedY;
 
-        Vector3 newPosition = new Vector3(
-            currentFollow.position.x,
-            targetY,
-            transform.position.z
-        );
+        Vector3 newPos = new Vector3(currentFollow.position.x, targetY, transform.position.z);
 
-        Vector3 smoothedPos = Vector3.Lerp(
-            transform.position,
-            newPosition,
-            smoothSpeed * Time.deltaTime
-        );
+        Vector3 smoothedPos = Vector3.Lerp(transform.position, newPos,
+                                           smoothSpeed * Time.unscaledDeltaTime);
 
-        // Zoom kamera dramatis saat cutscene
+        // Zoom dramatis saat cutscene boss, zoom out ke default setelah selesai
         if (cam != null)
         {
             float targetSize = overrideTarget != null ? cutsceneZoomSize : defaultOrthographicSize;
-            cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize, smoothSpeed * Time.deltaTime);
+            cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize,
+                                              smoothSpeed * Time.unscaledDeltaTime);
         }
 
-        // Tambahkan efek getaran layar jika sedang ada auman boss / shake
+        // Screen shake
         if (shakeTimer > 0)
         {
-            shakeTimer -= Time.deltaTime;
+            shakeTimer -= Time.unscaledDeltaTime;
             Vector2 randomShake = Random.insideUnitCircle * shakeMagnitude;
             smoothedPos += new Vector3(randomShake.x, randomShake.y, 0f);
         }

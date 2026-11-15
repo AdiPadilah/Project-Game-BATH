@@ -9,7 +9,7 @@ public class BossAI : Entity
     public float stopDistance = 1.5f;
 
     [Header("Visual & Size")]
-    public float bossScale = 2.5f;
+    public float bossScale = 3.2f;
     [Header("Attack")]
     public float attackRange = 3f;
     public float attackCooldown = 2f;
@@ -64,7 +64,7 @@ public class BossAI : Entity
         }
         else
         {
-            bossScale = 2.5f;
+            bossScale = 3.2f;
         }
 
         if (roarSound == null)
@@ -307,8 +307,8 @@ public class BossAI : Entity
 
     public void PlayRoar()
     {
-        // Pastikan skala boss sesuai setting scene (minimal 2.5)
-        bossScale = Mathf.Max(bossScale, 2.5f);
+        // Pastikan skala boss sesuai setting scene (minimal 3.2)
+        bossScale = Mathf.Max(bossScale, 3.2f);
 
         if (anim != null)
         {
