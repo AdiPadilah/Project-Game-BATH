@@ -115,21 +115,21 @@ public class PlayerHUD : MonoBehaviour
         rootRT.anchorMin = new Vector2(0f, 1f);
         rootRT.anchorMax = new Vector2(0f, 1f);
         rootRT.pivot     = new Vector2(0f, 1f);
-        rootRT.anchoredPosition = new Vector2(28f, -24f);
-        rootRT.sizeDelta        = new Vector2(380f, 100f);
+        rootRT.anchoredPosition = new Vector2(24f, -20f);
+        rootRT.sizeDelta        = new Vector2(400f, 110f);
 
-        // ── 2. Avatar Container & Frame ───────────────────────────────────────
+        // ── 2. Avatar Container & Frame (Naik ke atas rata atas) ─────────────
         GameObject avatarGO = new GameObject("Avatar_Container");
         avatarGO.transform.SetParent(hudRoot.transform, false);
 
         RectTransform avatarRT = avatarGO.AddComponent<RectTransform>();
-        avatarRT.anchorMin = new Vector2(0f, 0.5f);
-        avatarRT.anchorMax = new Vector2(0f, 0.5f);
-        avatarRT.pivot     = new Vector2(0f, 0.5f);
+        avatarRT.anchorMin = new Vector2(0f, 1f);
+        avatarRT.anchorMax = new Vector2(0f, 1f);
+        avatarRT.pivot     = new Vector2(0f, 1f);
         avatarRT.anchoredPosition = new Vector2(0f, 0f);
-        avatarRT.sizeDelta        = new Vector2(92f, 92f);
+        avatarRT.sizeDelta        = new Vector2(98f, 98f);
 
-        // Foto / Potret Karakter Ksatria (di lapisan dalam)
+        // Foto / Potret Karakter Ksatria (Jelas, besar, tajam)
         GameObject portraitGO = new GameObject("Player_Portrait");
         portraitGO.transform.SetParent(avatarGO.transform, false);
 
@@ -138,7 +138,7 @@ public class PlayerHUD : MonoBehaviour
         portraitRT.anchorMax = new Vector2(0.5f, 0.5f);
         portraitRT.pivot     = new Vector2(0.5f, 0.5f);
         portraitRT.anchoredPosition = Vector2.zero;
-        portraitRT.sizeDelta        = new Vector2(74f, 74f);
+        portraitRT.sizeDelta        = new Vector2(84f, 84f);
 
         Image portraitImg = portraitGO.AddComponent<Image>();
         if (playerPortraitSprite != null)
@@ -172,7 +172,7 @@ public class PlayerHUD : MonoBehaviour
         }
         frameImg.raycastTarget = false;
 
-        // ── 3. Bars Container (Di sebelah kanan Avatar) ───────────────────────
+        // ── 3. Bars Container (Turun sedikit ke bawah agar pas dengan Avatar) ──
         GameObject barsGO = new GameObject("Bars_Container");
         barsGO.transform.SetParent(hudRoot.transform, false);
 
@@ -180,16 +180,16 @@ public class PlayerHUD : MonoBehaviour
         barsRT.anchorMin = new Vector2(0f, 1f);
         barsRT.anchorMax = new Vector2(0f, 1f);
         barsRT.pivot     = new Vector2(0f, 1f);
-        barsRT.anchoredPosition = new Vector2(100f, -14f);
-        barsRT.sizeDelta        = new Vector2(270f, 70f);
+        barsRT.anchoredPosition = new Vector2(108f, -14f);
+        barsRT.sizeDelta        = new Vector2(280f, 80f);
 
-        // ── 4. HP Bar (Merah Ruby / Darah) ───────────────────────────────────
-        GameObject hpBarGO = CreateBar("HP_Bar", barsGO.transform, new Vector2(0f, 0f), new Vector2(250f, 24f),
+        // ── 4. HP Bar (Sedikit ke bawah) ─────────────────────────────────────
+        GameObject hpBarGO = CreateBar("HP_Bar", barsGO.transform, new Vector2(0f, -6f), new Vector2(250f, 24f),
                                        barBgSprite, hpFillSprite, out hpFillImage, out hpText,
                                        new Color(1f, 0.85f, 0.4f, 1f), "HP");
 
-        // ── 5. Mana Bar (Biru Safir / Energi Skill) ───────────────────────────
-        GameObject manaBarGO = CreateBar("Mana_Bar", barsGO.transform, new Vector2(0f, -30f), new Vector2(210f, 18f),
+        // ── 5. Mana Bar (Lebih ke bawah berjarak rapi) ────────────────────────
+        GameObject manaBarGO = CreateBar("Mana_Bar", barsGO.transform, new Vector2(0f, -38f), new Vector2(210f, 18f),
                                          barBgSprite, manaFillSprite, out manaFillImage, out manaText,
                                          new Color(0.45f, 0.88f, 1f, 1f), "MP");
     }
