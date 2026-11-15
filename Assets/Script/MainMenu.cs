@@ -41,7 +41,7 @@ public class MainMenu : MonoBehaviour
         {
             GameObject vigGO = new GameObject("Atmosphere_Vignette");
             vigGO.transform.SetParent(canvas.transform, false);
-            vigGO.transform.SetSiblingIndex(1); // Tepat di atas background
+            vigGO.transform.SetSiblingIndex(1);
 
             RectTransform rt = vigGO.AddComponent<RectTransform>();
             rt.anchorMin = Vector2.zero;
@@ -55,7 +55,7 @@ public class MainMenu : MonoBehaviour
             img.raycastTarget = false;
         }
 
-        // 2. Left menu shadow panel (agar tombol kontras dan terbaca jelas)
+        // 2. Left menu shadow panel
         if (leftVignette != null && canvas.transform.Find("Atmosphere_LeftPanel") == null)
         {
             GameObject panelGO = new GameObject("Atmosphere_LeftPanel");
@@ -102,7 +102,7 @@ public class MainMenu : MonoBehaviour
             Transform btnT = transform.Find(btnName);
             if (btnT == null) continue;
 
-            // RectTransform
+            // RectTransform tombol: pastikan x = 0 (lurus vertikal)
             RectTransform rt = btnT.GetComponent<RectTransform>();
             if (rt != null)
             {
@@ -113,7 +113,7 @@ public class MainMenu : MonoBehaviour
                 rt.sizeDelta        = new Vector2(260f, 52f);
             }
 
-            // Image latar tombol bergaya Dark Fantasy
+            // Image latar tombol
             Image img = btnT.GetComponent<Image>();
             if (img == null) img = btnT.gameObject.AddComponent<Image>();
 
@@ -125,7 +125,6 @@ public class MainMenu : MonoBehaviour
             }
             else
             {
-                // Fallback jika sprite belum di-import
                 img.color = new Color(0.10f, 0.06f, 0.12f, 0.75f);
             }
 
@@ -153,10 +152,10 @@ public class MainMenu : MonoBehaviour
                 }
             }
 
-            // Hover effect (animasi skala halus)
+            // Hover effect
             AddHoverEffect(btnT.gameObject);
 
-            // Styling TMP Text
+            // Styling TMP Text & pastikan 100% rata tengah dan margin 0
             foreach (var tmp in btnT.GetComponentsInChildren<TMP_Text>(true))
             {
                 tmp.text               = label;
@@ -165,11 +164,22 @@ public class MainMenu : MonoBehaviour
                 tmp.alignment          = TextAlignmentOptions.Center;
                 tmp.fontSize           = 28f;
                 tmp.characterSpacing   = 3f;
-                tmp.color              = new Color(1.0f, 0.95f, 0.82f, 1f); // emas berkilau
+                tmp.color              = new Color(1.0f, 0.95f, 0.82f, 1f);
+                tmp.margin             = Vector4.zero; // Margin nol agar teks presisi di tengah tombol
+
+                RectTransform textRt = tmp.GetComponent<RectTransform>();
+                if (textRt != null)
+                {
+                    textRt.anchorMin        = Vector2.zero;
+                    textRt.anchorMax        = Vector2.one;
+                    textRt.offsetMin        = Vector2.zero;
+                    textRt.offsetMax        = Vector2.zero;
+                    textRt.anchoredPosition = Vector2.zero;
+                }
             }
         }
 
-        Debug.Log("<color=gold>[MainMenu] Dark Fantasy theme diterapkan dengan rapi!</color>");
+        Debug.Log("<color=gold>[MainMenu] Semua tombol dan teks berhasil diluruskan presisi!</color>");
     }
 
     void AddHoverEffect(GameObject go)
@@ -178,7 +188,6 @@ public class MainMenu : MonoBehaviour
         if (trigger == null) trigger = go.AddComponent<EventTrigger>();
         trigger.triggers.Clear();
 
-        // Pointer Enter: scale up ke 1.04x
         EventTrigger.Entry enter = new EventTrigger.Entry();
         enter.eventID = EventTriggerType.PointerEnter;
         enter.callback.AddListener((data) => {
@@ -187,7 +196,6 @@ public class MainMenu : MonoBehaviour
         });
         trigger.triggers.Add(enter);
 
-        // Pointer Exit: scale kembali ke 1.0x
         EventTrigger.Entry exit = new EventTrigger.Entry();
         exit.eventID = EventTriggerType.PointerExit;
         exit.callback.AddListener((data) => {
@@ -223,7 +231,7 @@ public class MainMenu : MonoBehaviour
         var main = ps.main;
         main.loop           = true;
         main.startLifetime  = 5f;
-        main.startSpeed     = 0.6f;
+        main.startSpeed     = new ParticleSystem.MinMaxCurve(0.4f, 1.1f);
         main.startSize      = new ParticleSystem.MinMaxCurve(0.04f, 0.12f);
         main.startColor     = new ParticleSystem.MinMaxGradient(
             new Color(1f, 0.75f, 0.25f, 0.8f),
@@ -240,15 +248,17 @@ public class MainMenu : MonoBehaviour
         shape.scale     = new Vector3(16f, 0.5f, 1f);
         shape.position  = new Vector3(0f, -4.5f, 0f);
 
+        // Gunakan curve mode TwoConstants secara seragam pada semua axis X, Y, Z
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
-        vel.y = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
         vel.x = new ParticleSystem.MinMaxCurve(-0.2f, 0.2f);
+        vel.y = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
+        vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
         var renderer = emberGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 5;
 
-        Debug.Log("<color=orange>[MainMenu] Partikel ember api aktif!</color>");
+        Debug.Log("<color=orange>[MainMenu] Partikel ember api aktif tanpa error!</color>");
     }
 
     // ─────────────────────────────────────────────────────────────────────
