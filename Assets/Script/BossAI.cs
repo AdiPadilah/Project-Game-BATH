@@ -32,6 +32,7 @@ public class BossAI : Entity
     public AudioClip attackSound;
     public AudioClip hitSound;
     public AudioClip deathSound;
+    public AudioClip roarSound;
 
     private Transform player;
     private float attackTimer;
@@ -56,6 +57,23 @@ public class BossAI : Entity
         if (p != null) player = p.transform;
 
         if (sr != null) originalColor = sr.color;
+
+        // Pertahankan skala besar boss (4.0) dari scene agar tidak mengecil tiba-tiba
+        if (Mathf.Abs(transform.localScale.y) > 0.1f)
+        {
+            bossScale = Mathf.Abs(transform.localScale.y);
+        }
+        else
+        {
+            bossScale = 4.0f;
+        }
+
+        if (roarSound == null)
+        {
+#if UNITY_EDITOR
+            roarSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/MONSTER DEATH SCREAMS - FREE SOUND EFFECT [HD] - VKY Sounds (youtube).wav");
+#endif
+        }
 
         if (bossHealthBar != null)
         {
@@ -285,6 +303,53 @@ public class BossAI : Entity
         {
             float waktu = playerScript != null ? playerScript.waktuMain : 999f;
             vm.MunculkanMenang(waktu);
+        }
+    }
+
+    public void PlayRoar()
+    {
+        // Pastikan skala boss tetap besar (minimal 4.0)
+        bossScale = Mathf.Max(bossScale, 4.0f);
+
+        if (anim != null)
+        {
+            anim.ResetTrigger("Roar");
+            anim.SetTrigger("Roar");
+        }
+
+        if (audioSource != null && roarSound != null)
+        {
+            audioSource.PlayOneShot(roarSound, 1.3f);
+        }
+
+        // Hadapkan ke arah player saat mengaum
+        if (player != null)
+        {
+            float dir = player.position.x - transform.position.x;
+            if (dir > 0.1f)
+                transform.localScale = new Vector3(-bossScale, bossScale, 1f);
+            else if (dir < -0.1f)
+                transform.localScale = new Vector3(bossScale, bossScale, 1f);
+        }
+
+        StartCoroutine(RoarEffectRoutine());
+    }
+
+    private IEnumerator RoarEffectRoutine()
+    {
+        // Efek visual dramatis kobaran api merah/oranye saat mengaum
+        if (sr != null)
+        {
+            float elapsed = 0f;
+            Color fieryColor = new Color(1.3f, 0.6f, 0.3f, 1f);
+            while (elapsed < 1.8f)
+            {
+                elapsed += Time.deltaTime;
+                float pulse = (Mathf.Sin(elapsed * 12f) + 1f) * 0.5f;
+                sr.color = Color.Lerp(originalColor, fieryColor, 0.5f + pulse * 0.5f);
+                yield return null;
+            }
+            sr.color = originalColor;
         }
     }
 

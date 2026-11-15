@@ -40,9 +40,9 @@ public class Entity : MonoBehaviour
     [SerializeField] protected LayerMask whatIsGround;
 
     protected bool isGrounded;
-    protected bool canMove = true;
+    public bool canMove = true;
 
-    protected bool facingRight = true;
+    public bool facingRight = true;
     protected int facingDir = 1;
 
     protected virtual void Awake()

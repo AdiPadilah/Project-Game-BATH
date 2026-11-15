@@ -19,9 +19,15 @@ public class Player : Entity
     [Header("Attack & Combo")]
     [SerializeField] private float attackCooldown = 0.35f;
     [SerializeField] private float comboWindowTime = 0.6f; // Jendela waktu untuk tekan tombol combo berikutnya
-    [SerializeField] private AudioClip[] comboHitSounds; // Suara ekstra untuk combo finisher
     [SerializeField] private GameObject swordGlowEffect; // Slot jika ada object glow manual
     [SerializeField] private Color swordGlowColor = new Color(1f, 0.85f, 0.2f, 1f); // Warna emas bersinar
+
+    [Header("Dedicated Combat Audio (PlayerCombat/)")]
+    [SerializeField] private AudioClip slash1Sound;          // Basic attack step 1
+    [SerializeField] private AudioClip slash2Sound;          // Basic attack step 2
+    [SerializeField] private AudioClip slash3Sound;          // Basic attack step 3
+    [SerializeField] private AudioClip comboFlurrySound;     // Combo finisher swing sound
+    [SerializeField] private AudioClip comboFinisherImpactSound; // Combo finisher heavy impact on hit
 
     private float lastAttackTime = -999f;
     private float lastAttackEndTime = -999f;
@@ -73,6 +79,19 @@ public class Player : Entity
             dynamicSwordLight.intensity = 2.5f;
             dynamicSwordLight.enabled = false;
         }
+
+        // Auto-load dedicated combat audio dari Resources/PlayerCombat/ saat runtime
+        // Ini TIDAK memakai asset suara lama agar tidak tabrakan dengan suara monster
+        if (slash1Sound == null)
+            slash1Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_1");
+        if (slash2Sound == null)
+            slash2Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_2");
+        if (slash3Sound == null)
+            slash3Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_3");
+        if (comboFlurrySound == null)
+            comboFlurrySound = Resources.Load<AudioClip>("PlayerCombat/player_combo_flurry");
+        if (comboFinisherImpactSound == null)
+            comboFinisherImpactSound = Resources.Load<AudioClip>("PlayerCombat/player_combo_finisher_impact");
     }
 
     protected override void Update()
@@ -328,12 +347,45 @@ public class Player : Entity
     private void PlayAttackSoundForStep(int step)
     {
         if (audioSource == null) return;
-        AudioClip[] pool = (step == 4 && comboHitSounds != null && comboHitSounds.Length > 0)
-            ? comboHitSounds : hitSounds;
-        if (pool != null && pool.Length > 0)
+
+        // ===== DEDICATED COMBAT SOUNDS (tidak pakai asset lama) =====
+        if (step == 4)
         {
-            AudioClip clip = pool[Random.Range(0, pool.Length)];
-            audioSource.PlayOneShot(clip, Random.Range(0.85f, 1f));
+            // Kombo Finisher: suara ayunan flurry khusus
+            if (comboFlurrySound != null)
+            {
+                float origPitch = audioSource.pitch;
+                audioSource.pitch = Random.Range(1.1f, 1.3f);
+                audioSource.PlayOneShot(comboFlurrySound, 1f);
+                audioSource.pitch = origPitch;
+            }
+        }
+        else
+        {
+            // Basic Attack per step — tiap step punya warna suara tersendiri
+            AudioClip clip = null;
+            float pitch = 1f;
+
+            if (step == 1)      { clip = slash1Sound; pitch = Random.Range(0.95f, 1.05f); }
+            else if (step == 2) { clip = slash2Sound; pitch = Random.Range(1.05f, 1.15f); }
+            else if (step == 3) { clip = slash3Sound; pitch = Random.Range(0.88f, 0.98f); }
+
+            if (clip != null)
+            {
+                float origPitch = audioSource.pitch;
+                audioSource.pitch = pitch;
+                audioSource.PlayOneShot(clip, Random.Range(0.85f, 1f));
+                audioSource.pitch = origPitch;
+            }
+            else if (hitSounds != null && hitSounds.Length > 0)
+            {
+                // Fallback ke hitSounds jika file belum ter-load
+                AudioClip fallback = hitSounds[Random.Range(0, hitSounds.Length)];
+                float origPitch = audioSource.pitch;
+                audioSource.pitch = step == 1 ? 1.0f : (step == 2 ? 1.15f : 0.90f);
+                audioSource.PlayOneShot(fallback, Random.Range(0.85f, 0.95f));
+                audioSource.pitch = origPitch;
+            }
         }
     }
 
@@ -356,7 +408,19 @@ public class Player : Entity
                 if (currentComboStep == 1) damage = 3;
                 else if (currentComboStep == 2) damage = 4;
                 else if (currentComboStep == 3) damage = 5;
-                else if (currentComboStep == 4) damage = 4; // Multi-hit tebasan mutilasi (total ~16 damage)
+                else if (currentComboStep == 4)
+                {
+                    damage = 4; // Multi-hit tebasan mutilasi (total ~16 damage)
+
+                    // Efek suara dentuman berat saat eksekusi kombo mengenai musuh!
+                    if (audioSource != null && comboFinisherImpactSound != null)
+                    {
+                        float orig = audioSource.pitch;
+                        audioSource.pitch = Random.Range(0.9f, 1.1f);
+                        audioSource.PlayOneShot(comboFinisherImpactSound, 1.2f);
+                        audioSource.pitch = orig;
+                    }
+                }
 
                 enemy.TakeDamage(damage);
             }
