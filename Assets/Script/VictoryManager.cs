@@ -185,15 +185,16 @@ public class VictoryManager : MonoBehaviour
             }
         }
 
-        // Judul Utama: "✦ MISSION COMPLETE ✦"
+        // Judul Utama: "MISSION COMPLETE"
         TextMeshProUGUI titleTMP = victoryPanel.GetComponentInChildren<TextMeshProUGUI>();
         if (titleTMP != null)
         {
-            titleTMP.text = "✦ MISSION COMPLETE ✦";
+            titleTMP.text = "MISSION COMPLETE";
             titleTMP.fontSize = 34f;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.color = new Color(1f, 0.86f, 0.38f, 1f);
             titleTMP.alignment = TextAlignmentOptions.Center;
+            titleTMP.margin = Vector4.zero; // Reset margin agar benar-benar simetris di tengah!
 
             RectTransform trt = titleTMP.GetComponent<RectTransform>();
             trt.anchorMin = new Vector2(0.5f, 0.5f);
@@ -231,10 +232,11 @@ public class VictoryManager : MonoBehaviour
 
         if (statsTMP != null)
         {
-            statsTMP.text = $"WAKTU SELESAI: {waktu:F1}s   ✦   BINTANG: {jumlahBintang}/3";
+            statsTMP.text = $"WAKTU SELESAI: {waktu:F1}s  |  BINTANG: {jumlahBintang}/3";
             statsTMP.fontSize = 19f;
             statsTMP.color = new Color(0.92f, 0.89f, 0.82f, 0.95f);
             statsTMP.alignment = TextAlignmentOptions.Center;
+            statsTMP.margin = Vector4.zero;
         }
 
         // Posisi StarsContainer
@@ -287,11 +289,11 @@ public class VictoryManager : MonoBehaviour
 
         // Tombol "Next" (Lanjutkan)
         Transform nextBtn = victoryPanel.transform.Find("Next");
-        SetupButton(nextBtn, "LANJUTKAN  ▶", new Vector2(0f, -62f), new Color(1f, 0.88f, 0.50f, 1f), KeNext);
+        SetupButton(nextBtn, "LANJUTKAN", new Vector2(0f, -62f), new Color(1f, 0.88f, 0.50f, 1f), KeNext);
 
         // Tombol "Home" (Menu Utama)
         Transform homeBtn = victoryPanel.transform.Find("Home");
-        SetupButton(homeBtn, "◀  MENU UTAMA", new Vector2(0f, -128f), new Color(0.92f, 0.90f, 0.84f, 1f), KeHome);
+        SetupButton(homeBtn, "MENU UTAMA", new Vector2(0f, -128f), new Color(0.92f, 0.90f, 0.84f, 1f), KeHome);
     }
 
     private void SetupButton(Transform btnT, string label, Vector2 pos, Color textColor, UnityEngine.Events.UnityAction onClick)
@@ -366,6 +368,7 @@ public class VictoryManager : MonoBehaviour
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = textColor;
             tmp.alignment = TextAlignmentOptions.Center;
+            tmp.margin = Vector4.zero;
         }
     }
 
