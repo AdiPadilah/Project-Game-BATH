@@ -102,7 +102,7 @@ public class MainMenu : MonoBehaviour
             Transform btnT = transform.Find(btnName);
             if (btnT == null) continue;
 
-            // RectTransform tombol: pastikan x = 0 (lurus vertikal)
+            // RectTransform tombol: x = 0 (rata tegak lurus sempurna)
             RectTransform rt = btnT.GetComponent<RectTransform>();
             if (rt != null)
             {
@@ -155,7 +155,7 @@ public class MainMenu : MonoBehaviour
             // Hover effect
             AddHoverEffect(btnT.gameObject);
 
-            // Styling TMP Text & pastikan 100% rata tengah dan margin 0
+            // Styling TMP Text: margin nol & rata tengah presisi
             foreach (var tmp in btnT.GetComponentsInChildren<TMP_Text>(true))
             {
                 tmp.text               = label;
@@ -165,7 +165,7 @@ public class MainMenu : MonoBehaviour
                 tmp.fontSize           = 28f;
                 tmp.characterSpacing   = 3f;
                 tmp.color              = new Color(1.0f, 0.95f, 0.82f, 1f);
-                tmp.margin             = Vector4.zero; // Margin nol agar teks presisi di tengah tombol
+                tmp.margin             = Vector4.zero;
 
                 RectTransform textRt = tmp.GetComponent<RectTransform>();
                 if (textRt != null)
@@ -229,36 +229,32 @@ public class MainMenu : MonoBehaviour
         ParticleSystem ps  = emberGO.AddComponent<ParticleSystem>();
 
         var main = ps.main;
-        main.loop           = true;
-        main.startLifetime  = 5f;
-        main.startSpeed     = new ParticleSystem.MinMaxCurve(0.4f, 1.1f);
-        main.startSize      = new ParticleSystem.MinMaxCurve(0.04f, 0.12f);
-        main.startColor     = new ParticleSystem.MinMaxGradient(
-            new Color(1f, 0.75f, 0.25f, 0.8f),
-            new Color(1f, 0.40f, 0.05f, 0.6f)
+        main.loop            = true;
+        main.startLifetime   = 6f;
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(0.04f, 0.12f);
+        main.startColor      = new ParticleSystem.MinMaxGradient(
+            new Color(1f, 0.8f, 0.25f, 0.85f),
+            new Color(1f, 0.45f, 0.08f, 0.65f)
         );
-        main.maxParticles   = 35;
-        main.simulationSpace= ParticleSystemSimulationSpace.World;
+        main.maxParticles    = 40;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = -0.02f; // Gravitasi negatif membuat partikel melayang pelan ke atas tanpa error velocity
 
         var emission = ps.emission;
-        emission.rateOverTime = 6f;
+        emission.rateOverTime = 7f;
 
+        // Emitter di dasar layar menghadap ke atas
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale     = new Vector3(16f, 0.5f, 1f);
-        shape.position  = new Vector3(0f, -4.5f, 0f);
-
-        // Gunakan curve mode TwoConstants secara seragam pada semua axis X, Y, Z
-        var vel = ps.velocityOverLifetime;
-        vel.enabled = true;
-        vel.x = new ParticleSystem.MinMaxCurve(-0.2f, 0.2f);
-        vel.y = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
-        vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);
+        shape.scale     = new Vector3(18f, 0.5f, 1f);
+        shape.position  = new Vector3(0f, -5.2f, 0f);
+        shape.rotation  = new Vector3(-90f, 0f, 0f);
 
         var renderer = emberGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 5;
 
-        Debug.Log("<color=orange>[MainMenu] Partikel ember api aktif tanpa error!</color>");
+        Debug.Log("<color=orange>[MainMenu] Partikel ember api aktif sempurna tanpa error!</color>");
     }
 
     // ─────────────────────────────────────────────────────────────────────
