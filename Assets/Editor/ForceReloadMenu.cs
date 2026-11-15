@@ -43,6 +43,7 @@ public static class ForceReloadMenu
 
         try
         {
+            AssetDatabase.Refresh();
             EditorSceneManager.OpenScene("Assets/Scenes/Main Menu.unity", OpenSceneMode.Single);
             Debug.Log("<color=cyan>[ForceReloadMenu] ✓ Main Menu.unity berhasil di-reload dari disk!</color>");
         }
