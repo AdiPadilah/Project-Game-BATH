@@ -55,6 +55,7 @@ public class Player : Entity
     public int GetMaxMana() => maxMana;
     public void UseMana(int amount) { currentMana = Mathf.Clamp(currentMana - amount, 0, maxMana); }
     public void RestoreMana(int amount) { currentMana = Mathf.Clamp(currentMana + amount, 0, maxMana); }
+    public LayerMask GetEnemyLayer() => enemyLayer;
 
     public float waktuMain = 0f;
     public bool sudahMenang = false;

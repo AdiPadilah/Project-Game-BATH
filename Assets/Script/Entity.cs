@@ -113,7 +113,7 @@ public class Entity : MonoBehaviour
     public Rigidbody2D GetRigidbody() => rb;
     public Animator GetAnimator() => anim;
     public Transform GetAttackPoint() => entityAttackPoint;
-    public LayerMask GetEnemyLayer() => enemyLayer;
+    public LayerMask GetTargetLayer() => whatIsTarget;
 
     protected virtual void Die()
     {
