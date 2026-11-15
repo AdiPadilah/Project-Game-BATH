@@ -22,12 +22,8 @@ public class Player : Entity
     [SerializeField] private GameObject swordGlowEffect; // Slot jika ada object glow manual
     [SerializeField] private Color swordGlowColor = new Color(1f, 0.85f, 0.2f, 1f); // Warna emas bersinar
 
-    [Header("Dedicated Combat Audio (PlayerCombat/)")]
-    [SerializeField] private AudioClip slash1Sound;          // Basic attack step 1
-    [SerializeField] private AudioClip slash2Sound;          // Basic attack step 2
-    [SerializeField] private AudioClip slash3Sound;          // Basic attack step 3
-    [SerializeField] private AudioClip comboFlurrySound;     // Combo finisher swing sound
-    [SerializeField] private AudioClip comboFinisherImpactSound; // Combo finisher heavy impact on hit
+    [Header("Combo Audio")]
+    [SerializeField] private AudioClip comboFinisherImpactSound; // Suara impact saat kombo kena musuh (opsional)
 
     private float lastAttackTime = -999f;
     private float lastAttackEndTime = -999f;
@@ -80,18 +76,14 @@ public class Player : Entity
             dynamicSwordLight.enabled = false;
         }
 
-        // Auto-load dedicated combat audio dari Resources/PlayerCombat/ saat runtime
-        // Ini TIDAK memakai asset suara lama agar tidak tabrakan dengan suara monster
-        if (slash1Sound == null)
-            slash1Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_1");
-        if (slash2Sound == null)
-            slash2Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_2");
-        if (slash3Sound == null)
-            slash3Sound = Resources.Load<AudioClip>("PlayerCombat/player_slash_3");
-        if (comboFlurrySound == null)
-            comboFlurrySound = Resources.Load<AudioClip>("PlayerCombat/player_combo_flurry");
+        // Auto-assign comboFinisherImpactSound dari asset yang sudah ada
         if (comboFinisherImpactSound == null)
-            comboFinisherImpactSound = Resources.Load<AudioClip>("PlayerCombat/player_combo_finisher_impact");
+        {
+#if UNITY_EDITOR
+            comboFinisherImpactSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(
+                "Assets/Sound/yodguard-a-massive-axe-impact-hitting-metal-4-450252.mp3");
+#endif
+        }
     }
 
     protected override void Update()
@@ -346,47 +338,33 @@ public class Player : Entity
 
     private void PlayAttackSoundForStep(int step)
     {
-        if (audioSource == null) return;
+        if (audioSource == null || hitSounds == null || hitSounds.Length == 0) return;
 
-        // ===== DEDICATED COMBAT SOUNDS (tidak pakai asset lama) =====
+        AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
+        float origPitch = audioSource.pitch;
+
         if (step == 4)
         {
-            // Kombo Finisher: suara ayunan flurry khusus
-            if (comboFlurrySound != null)
-            {
-                float origPitch = audioSource.pitch;
-                audioSource.pitch = Random.Range(1.1f, 1.3f);
-                audioSource.PlayOneShot(comboFlurrySound, 1f);
-                audioSource.pitch = origPitch;
-            }
+            // Kombo Finisher: pakai hitSounds yang sama tapi pitch lebih tinggi & cepat
+            // terdengar lebih intens/urgent dibanding basic attack
+            audioSource.pitch = Random.Range(1.3f, 1.5f);
+            audioSource.PlayOneShot(clip, 1f);
+
+            // Langsung bunyikan lagi dengan pitch beda — efek flurry dobel
+            AudioClip clip2 = hitSounds[Random.Range(0, hitSounds.Length)];
+            audioSource.pitch = Random.Range(1.4f, 1.6f);
+            audioSource.PlayOneShot(clip2, 0.75f);
         }
         else
         {
-            // Basic Attack per step — tiap step punya warna suara tersendiri
-            AudioClip clip = null;
-            float pitch = 1f;
-
-            if (step == 1)      { clip = slash1Sound; pitch = Random.Range(0.95f, 1.05f); }
-            else if (step == 2) { clip = slash2Sound; pitch = Random.Range(1.05f, 1.15f); }
-            else if (step == 3) { clip = slash3Sound; pitch = Random.Range(0.88f, 0.98f); }
-
-            if (clip != null)
-            {
-                float origPitch = audioSource.pitch;
-                audioSource.pitch = pitch;
-                audioSource.PlayOneShot(clip, Random.Range(0.85f, 1f));
-                audioSource.pitch = origPitch;
-            }
-            else if (hitSounds != null && hitSounds.Length > 0)
-            {
-                // Fallback ke hitSounds jika file belum ter-load
-                AudioClip fallback = hitSounds[Random.Range(0, hitSounds.Length)];
-                float origPitch = audioSource.pitch;
-                audioSource.pitch = step == 1 ? 1.0f : (step == 2 ? 1.15f : 0.90f);
-                audioSource.PlayOneShot(fallback, Random.Range(0.85f, 0.95f));
-                audioSource.pitch = origPitch;
-            }
+            // Basic attack: pitch naik tiap step biar terasa progresif
+            // Step 1 = pitch normal, Step 2 = sedikit naik, Step 3 = sedikit turun (berat)
+            float pitch = step == 1 ? 1.0f : (step == 2 ? 1.15f : 0.90f);
+            audioSource.pitch = pitch * Random.Range(0.95f, 1.05f);
+            audioSource.PlayOneShot(clip, Random.Range(0.85f, 0.95f));
         }
+
+        audioSource.pitch = origPitch;
     }
 
     public override void DamageTargets()
