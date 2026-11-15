@@ -80,6 +80,38 @@ public class BossAI : Entity
         {
             bossHealthBar.maxValue = maxHealth;
             bossHealthBar.value = maxHealth; // Pastikan Slider langsung penuh
+            SetupBossNameText();
+        }
+    }
+
+    private void SetupBossNameText()
+    {
+        if (bossHealthBar == null) return;
+        Text t = bossHealthBar.GetComponentInChildren<Text>();
+        if (t == null)
+        {
+            GameObject txtGo = new GameObject("BossNameLabel");
+            txtGo.transform.SetParent(bossHealthBar.transform, false);
+            t = txtGo.AddComponent<Text>();
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.text = "King Demon Slime";
+            t.fontSize = 22;
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.color = new Color(1f, 0.85f, 0.45f, 1f); // Golden amber
+            RectTransform rt = txtGo.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, 4f);
+            rt.sizeDelta = new Vector2(0f, 26f);
+            Outline outline = txtGo.AddComponent<Outline>();
+            outline.effectColor = new Color(0.15f, 0.02f, 0.02f, 1f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+        }
+        else
+        {
+            t.text = "King Demon Slime";
         }
     }
 
