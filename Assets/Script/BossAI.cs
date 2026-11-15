@@ -10,7 +10,6 @@ public class BossAI : Entity
 
     [Header("Visual & Size")]
     public float bossScale = 2.5f;
-
     [Header("Attack")]
     public float attackRange = 3f;
     public float attackCooldown = 2f;
@@ -58,14 +57,14 @@ public class BossAI : Entity
 
         if (sr != null) originalColor = sr.color;
 
-        // Pertahankan skala besar boss (4.0) dari scene agar tidak mengecil tiba-tiba
+        // Pertahankan skala boss dari scene agar tidak berubah saat runtime
         if (Mathf.Abs(transform.localScale.y) > 0.1f)
         {
             bossScale = Mathf.Abs(transform.localScale.y);
         }
         else
         {
-            bossScale = 4.0f;
+            bossScale = 2.5f;
         }
 
         if (roarSound == null)
@@ -308,8 +307,8 @@ public class BossAI : Entity
 
     public void PlayRoar()
     {
-        // Pastikan skala boss tetap besar (minimal 4.0)
-        bossScale = Mathf.Max(bossScale, 4.0f);
+        // Pastikan skala boss sesuai setting scene (minimal 2.5)
+        bossScale = Mathf.Max(bossScale, 2.5f);
 
         if (anim != null)
         {

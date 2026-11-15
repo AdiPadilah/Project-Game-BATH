@@ -20,11 +20,6 @@ public class EnergiBarierEffect : MonoBehaviour
     [SerializeField] private Color secondaryColor = new Color(0.1f, 0.65f, 1f); // Electric Blue
     [SerializeField] private Color flareColor = new Color(0.9f, 1f, 1f);        // Shield Protect White-Cyan
 
-    [Header("Audio")]
-    [SerializeField] private AudioClip shieldDeflectSound;
-    private AudioSource audioSource;
-    private float lastSoundTime = -999f;
-
     private float touchFlare = 0f;
     private float initialScaleY = 17f;
 
@@ -32,22 +27,6 @@ public class EnergiBarierEffect : MonoBehaviour
     {
         sr = GetComponent<SpriteRenderer>();
         initialScaleY = transform.localScale.y;
-
-        // Pasang AudioSource jika belum ada untuk efek dengung perisai
-        audioSource = GetComponent<AudioSource>();
-        if (audioSource == null)
-        {
-            audioSource = gameObject.AddComponent<AudioSource>();
-            audioSource.playOnAwake = false;
-            audioSource.spatialBlend = 0.5f;
-        }
-
-        if (shieldDeflectSound == null)
-        {
-#if UNITY_EDITOR
-            shieldDeflectSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/yodguard-a-massive-axe-impact-hitting-metal-4-450252.mp3");
-#endif
-        }
 
         // Atur skala awal menjadi segaris tipis
         transform.localScale = new Vector3(baseScaleX, initialScaleY, 1f);
@@ -117,13 +96,6 @@ public class EnergiBarierEffect : MonoBehaviour
     private void TriggerShieldProtect(Collision2D collision)
     {
         touchFlare = 1.0f;
-
-        // Putar suara dengung perisai (jika ada jeda)
-        if (Time.time > lastSoundTime + 0.35f && audioSource != null && shieldDeflectSound != null)
-        {
-            audioSource.PlayOneShot(shieldDeflectSound, 0.7f);
-            lastSoundTime = Time.time;
-        }
 
         // Efek gaya tolak perisai (pushback) agar tidak bisa ditembus saat dipaksa dorong
         Rigidbody2D otherRb = collision.rigidbody;
