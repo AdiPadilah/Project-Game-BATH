@@ -13,13 +13,25 @@ public class MainMenu : MonoBehaviour
     private Sprite btnPressed;
     private Sprite leftVignette;
     private Sprite screenVignette;
+    private Sprite fireGlowSprite;
+
+    // Komponen Dynamic Background
+    private RectTransform bgRect;
+    private Vector2 bgBasePos;
+    private Vector2 currentParallax;
+    private Image fireGlowImg;
+    private RectTransform fireGlowRect;
+    private Image sunHaloImg;
+    private RectTransform sunHaloRect;
 
     void Start()
     {
         LoadFantasyAssets();
         BuildAtmosphere();
+        SetupDynamicBackground();
         FixMenuLayout();
         SpawnFloatingEmbers();
+        SpawnDragonMouthSparks();
     }
 
     void LoadFantasyAssets()
@@ -29,6 +41,7 @@ public class MainMenu : MonoBehaviour
         btnPressed     = Resources.Load<Sprite>("UI/btn_fantasy_pressed");
         leftVignette   = Resources.Load<Sprite>("UI/menu_left_vignette");
         screenVignette = Resources.Load<Sprite>("UI/screen_vignette");
+        fireGlowSprite = Resources.Load<Sprite>("UI/fire_glow");
     }
 
     void BuildAtmosphere()
@@ -75,9 +88,124 @@ public class MainMenu : MonoBehaviour
         }
     }
 
+    void SetupDynamicBackground()
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        // Cari GameObject Background
+        Transform bgT = canvas.transform.Find("Background");
+        if (bgT != null)
+        {
+            bgRect = bgT.GetComponent<RectTransform>();
+            if (bgRect != null)
+            {
+                bgBasePos = bgRect.anchoredPosition;
+                // Skala sedikit agar saat drifting tidak ada tepi hitam
+                bgRect.localScale = new Vector3(1.06f, 1.06f, 1f);
+
+                // Tambahkan efek cahaya api di mulut naga
+                if (fireGlowSprite != null && bgT.Find("Dragon_Fire_Glow") == null)
+                {
+                    GameObject glowGO = new GameObject("Dragon_Fire_Glow");
+                    glowGO.transform.SetParent(bgT, false);
+
+                    fireGlowRect = glowGO.AddComponent<RectTransform>();
+                    // Posisi mulut naga (sekitar x=0.594, y=0.463 dari background)
+                    fireGlowRect.anchorMin = new Vector2(0.594f, 0.463f);
+                    fireGlowRect.anchorMax = new Vector2(0.594f, 0.463f);
+                    fireGlowRect.pivot     = new Vector2(0.5f, 0.5f);
+                    fireGlowRect.sizeDelta = new Vector2(170f, 170f);
+                    fireGlowRect.anchoredPosition = Vector2.zero;
+
+                    fireGlowImg = glowGO.AddComponent<Image>();
+                    fireGlowImg.sprite = fireGlowSprite;
+                    fireGlowImg.color  = new Color(1f, 0.65f, 0.2f, 0.55f);
+                    fireGlowImg.raycastTarget = false;
+                }
+
+                // Tambahkan efek denyut cahaya halo matahari di langit
+                if (fireGlowSprite != null && bgT.Find("Sun_Halo_Glow") == null)
+                {
+                    GameObject haloGO = new GameObject("Sun_Halo_Glow");
+                    haloGO.transform.SetParent(bgT, false);
+
+                    sunHaloRect = haloGO.AddComponent<RectTransform>();
+                    sunHaloRect.anchorMin = new Vector2(0.505f, 0.705f);
+                    sunHaloRect.anchorMax = new Vector2(0.505f, 0.705f);
+                    sunHaloRect.pivot     = new Vector2(0.5f, 0.5f);
+                    sunHaloRect.sizeDelta = new Vector2(320f, 320f);
+                    sunHaloRect.anchoredPosition = Vector2.zero;
+
+                    sunHaloImg = haloGO.AddComponent<Image>();
+                    sunHaloImg.sprite = fireGlowSprite;
+                    sunHaloImg.color  = new Color(1f, 0.85f, 0.4f, 0.20f);
+                    sunHaloImg.raycastTarget = false;
+                }
+            }
+        }
+    }
+
+    void Update()
+    {
+        AnimateBackgroundMotion();
+        AnimateFireAndGlow();
+    }
+
+    void AnimateBackgroundMotion()
+    {
+        if (bgRect == null) return;
+
+        float t = Time.time;
+
+        // 1. Ken Burns Cinematic Drift: kamera melayang pelan mengikuti naga
+        float driftX = Mathf.Sin(t * 0.22f) * 14f;
+        float driftY = Mathf.Cos(t * 0.18f) * 8f;
+        float zoom   = 1.06f + Mathf.Sin(t * 0.12f) * 0.015f;
+        bgRect.localScale = new Vector3(zoom, zoom, 1f);
+
+        // 2. Interactive Mouse Parallax: background bergeser halus mengikuti gerakan kursor mouse
+        Vector2 mouseNorm = Vector2.zero;
+        if (Screen.width > 0 && Screen.height > 0)
+        {
+            mouseNorm = new Vector2(
+                (Input.mousePosition.x / Screen.width) - 0.5f,
+                (Input.mousePosition.y / Screen.height) - 0.5f
+            );
+        }
+        Vector2 targetParallax = new Vector2(-mouseNorm.x * 22f, -mouseNorm.y * 14f);
+        currentParallax = Vector2.Lerp(currentParallax, targetParallax, Time.deltaTime * 3.5f);
+
+        bgRect.anchoredPosition = bgBasePos + new Vector2(driftX, driftY) + currentParallax;
+    }
+
+    void AnimateFireAndGlow()
+    {
+        float t = Time.time;
+
+        // Api di mulut naga berkedip dan bernapas hidup
+        if (fireGlowImg != null && fireGlowRect != null)
+        {
+            float flicker = Mathf.PerlinNoise(t * 5.5f, 0f);
+            float scaleMul = 0.92f + flicker * 0.25f;
+            fireGlowRect.localScale = new Vector3(scaleMul, scaleMul, 1f);
+
+            float alpha = 0.40f + flicker * 0.35f;
+            fireGlowImg.color = new Color(1f, 0.65f, 0.18f, alpha);
+        }
+
+        // Halo matahari di langit berdenyut halus
+        if (sunHaloImg != null && sunHaloRect != null)
+        {
+            float pulse = Mathf.Sin(t * 1.2f) * 0.5f + 0.5f;
+            float s = 0.95f + pulse * 0.10f;
+            sunHaloRect.localScale = new Vector3(s, s, 1f);
+            sunHaloImg.color = new Color(1f, 0.85f, 0.45f, 0.15f + pulse * 0.15f);
+        }
+    }
+
     void FixMenuLayout()
     {
-        // Posisi container Main Menu di sisi kiri
         RectTransform me = GetComponent<RectTransform>();
         if (me != null)
         {
@@ -88,7 +216,6 @@ public class MainMenu : MonoBehaviour
             me.sizeDelta        = new Vector2(300f, 380f);
         }
 
-        // Urutan tombol resmi: PLAY (atas) -> BIODATA -> ABOUT -> QUIT (bawah)
         var buttons = new (string btn, string txtLabel, float yPos)[]
         {
             ("Play Button",      "PLAY",     105f),
@@ -102,7 +229,6 @@ public class MainMenu : MonoBehaviour
             Transform btnT = transform.Find(btnName);
             if (btnT == null) continue;
 
-            // RectTransform tombol: x = 0 (rata tegak lurus sempurna)
             RectTransform rt = btnT.GetComponent<RectTransform>();
             if (rt != null)
             {
@@ -113,7 +239,6 @@ public class MainMenu : MonoBehaviour
                 rt.sizeDelta        = new Vector2(260f, 52f);
             }
 
-            // Image latar tombol
             Image img = btnT.GetComponent<Image>();
             if (img == null) img = btnT.gameObject.AddComponent<Image>();
 
@@ -128,7 +253,6 @@ public class MainMenu : MonoBehaviour
                 img.color = new Color(0.10f, 0.06f, 0.12f, 0.75f);
             }
 
-            // Button transitions
             Button btn = btnT.GetComponent<Button>();
             if (btn != null)
             {
@@ -152,10 +276,8 @@ public class MainMenu : MonoBehaviour
                 }
             }
 
-            // Hover effect
             AddHoverEffect(btnT.gameObject);
 
-            // Styling TMP Text: margin nol & rata tengah presisi
             foreach (var tmp in btnT.GetComponentsInChildren<TMP_Text>(true))
             {
                 tmp.text               = label;
@@ -239,12 +361,11 @@ public class MainMenu : MonoBehaviour
         );
         main.maxParticles    = 40;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.gravityModifier = -0.02f; // Gravitasi negatif membuat partikel melayang pelan ke atas tanpa error velocity
+        main.gravityModifier = -0.02f;
 
         var emission = ps.emission;
         emission.rateOverTime = 7f;
 
-        // Emitter di dasar layar menghadap ke atas
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale     = new Vector3(18f, 0.5f, 1f);
@@ -253,8 +374,45 @@ public class MainMenu : MonoBehaviour
 
         var renderer = emberGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 5;
+    }
 
-        Debug.Log("<color=orange>[MainMenu] Partikel ember api aktif sempurna tanpa error!</color>");
+    void SpawnDragonMouthSparks()
+    {
+        if (GameObject.Find("Dragon_Mouth_Sparks") != null) return;
+
+        GameObject sparkGO = new GameObject("Dragon_Mouth_Sparks");
+        // Posisi tepat di mulut naga di 2D/3D space
+        sparkGO.transform.position = new Vector3(1.8f, -0.6f, 0f);
+
+        ParticleSystem ps = sparkGO.AddComponent<ParticleSystem>();
+
+        var main = ps.main;
+        main.loop            = true;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(1.5f, 3.0f);
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(0.8f, 2.2f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(0.03f, 0.08f);
+        main.startColor      = new ParticleSystem.MinMaxGradient(
+            new Color(1f, 0.9f, 0.3f, 0.9f),
+            new Color(1f, 0.35f, 0.05f, 0.7f)
+        );
+        main.maxParticles    = 25;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = -0.015f;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 8f;
+
+        // Semburkan percikan api ke arah kiri-atas (melawan arah terbang naga)
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle     = 25f;
+        shape.radius    = 0.15f;
+        shape.rotation  = new Vector3(0f, 0f, 160f); // Arahkan ke kiri
+
+        var renderer = sparkGO.GetComponent<ParticleSystemRenderer>();
+        renderer.sortingOrder = 6;
+
+        Debug.Log("<color=orange>[MainMenu] Dynamic Live Wallpaper & Dragon Breath aktif!</color>");
     }
 
     // ─────────────────────────────────────────────────────────────────────
