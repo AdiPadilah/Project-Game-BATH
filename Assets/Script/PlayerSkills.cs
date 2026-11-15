@@ -20,21 +20,21 @@ public class PlayerSkills : MonoBehaviour
 
     // ─── Stat & Biaya Mana (Hemat & Sakti!) ──────────────────────────────────
     [Header("Skill 1 - Phantom Thrust [A]")]
-    [SerializeField] private int   skill1Cost = 12;         // Hemat (sebelumnya 25)
-    [SerializeField] private float skill1Cooldown = 2.2f;   // Cepat (sebelumnya 3.5s)
-    [SerializeField] private int   skill1Damage = 65;       // Sakti (sebelumnya 35)
+    [SerializeField] private int   skill1Cost = 12;
+    [SerializeField] private float skill1Cooldown = 2.2f;
+    [SerializeField] private int   skill1Damage = 65;
     private float skill1Timer = 0f;
 
     [Header("Skill 2 - Cyclone Crescent [S]")]
-    [SerializeField] private int   skill2Cost = 20;         // Hemat (sebelumnya 40)
-    [SerializeField] private float skill2Cooldown = 4.0f;   // Cepat (sebelumnya 6.0s)
-    [SerializeField] private int   skill2Damage = 95;       // Sakti (sebelumnya 55)
+    [SerializeField] private int   skill2Cost = 20;
+    [SerializeField] private float skill2Cooldown = 4.0f;
+    [SerializeField] private int   skill2Damage = 95;
     private float skill2Timer = 0f;
 
     [Header("Skill 3 - Judgement of the End (ULTIMATE) [W]")]
-    [SerializeField] private int   skill3Cost = 45;         // Hemat (sebelumnya 80)
-    [SerializeField] private float skill3Cooldown = 11.0f;  // Cepat (sebelumnya 18.0s)
-    [SerializeField] private int   skill3DamageTotal = 300; // Super Sakti (sebelumnya 125)
+    [SerializeField] private int   skill3Cost = 45;
+    [SerializeField] private float skill3Cooldown = 11.0f;
+    [SerializeField] private int   skill3DamageTotal = 300;
     private float skill3Timer = 0f;
 
     [Header("Audio SFX")]
@@ -48,6 +48,10 @@ public class PlayerSkills : MonoBehaviour
     private Sprite fxSlashCross;
     private Sprite fxThrustStreak;
     private Sprite fxWhirlwind;
+
+    // Cut-In Assets
+    private Sprite cutInBanner;
+    private Sprite playerPortrait;
 
     // State
     public bool isCastingSkill = false;
@@ -90,6 +94,9 @@ public class PlayerSkills : MonoBehaviour
         fxSlashCross    = Resources.Load<Sprite>("FX/fx_slash_cross");
         fxThrustStreak  = Resources.Load<Sprite>("FX/fx_thrust_streak");
         fxWhirlwind     = Resources.Load<Sprite>("FX/fx_whirlwind_ring");
+
+        cutInBanner   = Resources.Load<Sprite>("UI/ult_cutin_banner");
+        playerPortrait = Resources.Load<Sprite>("UI/hud_player_portrait");
     }
 
     private void Update()
@@ -174,10 +181,8 @@ public class PlayerSkills : MonoBehaviour
             elapsed += Time.deltaTime;
             rb.velocity = new Vector2(dir * dashSpeed, 0f);
 
-            // Munculkan bayangan karakter (Afterimage)
             SpawnAfterimage(new Color(1f, 0.85f, 0.25f, 0.65f));
 
-            // Deteksi tabrakan tebasan di lintasan
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, 1.8f, player.GetEnemyLayer());
             foreach (var hit in hits)
             {
@@ -186,9 +191,8 @@ public class PlayerSkills : MonoBehaviour
                 {
                     hitEnemies.Add(enemy);
                     enemy.TakeDamage(skill1Damage, false);
-                    player.RestoreMana(8); // Refund mana saat kena musuh
+                    player.RestoreMana(8);
 
-                    // Efek tebasan menyilang di badan musuh
                     SpawnVisualFX(enemy.transform.position, fxSlashCross, Vector3.one * 0.9f, Random.Range(-25f, 25f), 0.22f, Color.white);
                 }
             }
@@ -224,25 +228,20 @@ public class PlayerSkills : MonoBehaviour
         if (sfxCyclone != null && audioSource != null)
             audioSource.PlayOneShot(sfxCyclone, 1.15f);
 
-        // Sedikit melompat ke udara saat mengayunkan pedang melingkar
         rb.velocity = new Vector2(rb.velocity.x * 0.3f, 5.0f);
 
         if (anim != null)
             anim.SetTrigger("attackCombo");
 
-        // 1. Munculkan cincin gelombang angin shockwave emas membesar
         SpawnVisualFX(transform.position, fxWhirlwind, Vector3.one * 1.2f, 0f, 0.35f, new Color(1f, 0.88f, 0.35f, 0.9f), true, 3.2f);
 
-        // Screen shake sedang
         if (CameraFollow.instance != null)
             CameraFollow.instance.TriggerScreenShake(0.32f, 0.28f);
 
-        // Sapuan pertama (depan & atas)
         yield return new WaitForSeconds(0.10f);
         SpawnVisualFX(transform.position + new Vector3(0.5f, 0.3f, 0f), fxSlashArc, Vector3.one * 1.5f, 45f, 0.22f, Color.white);
         HitCycloneArea(skill2Damage / 2, false);
 
-        // Sapuan kedua (belakang & bawah) - Knockback musuh melayang
         yield return new WaitForSeconds(0.14f);
         SpawnVisualFX(transform.position + new Vector3(-0.5f, 0.2f, 0f), fxSlashArc, new Vector3(-1.6f, 1.6f, 1f), -45f, 0.22f, Color.white);
         HitCycloneArea(skill2Damage / 2, true);
@@ -289,19 +288,22 @@ public class PlayerSkills : MonoBehaviour
 
         float dir = player.facingRight ? 1f : -1f;
 
-        // ── FASE 1: Dramatic Anime Time Freeze (0.16s) ───────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // CUT-IN ANIMATION (Sebelum apapun: banner slide masuk dari kanan)
+        // ══════════════════════════════════════════════════════════════════════
+        yield return StartCoroutine(ShowUltimateCutIn());
+
+        // ── FASE 1: Dramatic Anime Time Freeze ────────────────────────────────
         Time.timeScale = 0.08f;
 
-        // Suara charge pembuka ultimate
         if (sfxUltimate != null && audioSource != null)
             audioSource.PlayOneShot(sfxUltimate, 1.25f);
 
-        // Efek aura cahaya emas di sekitar ksatria
         SpawnVisualFX(transform.position, fxWhirlwind, Vector3.one * 1.8f, 0f, 0.25f, new Color(1f, 0.85f, 0.2f, 0.95f), true, 2.5f);
 
         yield return new WaitForSecondsRealtime(0.16f);
 
-        // ── FASE 2: Dimensional Blade Blitz (Tebasan Menembus Ruang) ────────
+        // ── FASE 2: Dimensional Blade Blitz ────────────────────────────────────
         Time.timeScale = 1.0f;
 
         if (CameraFollow.instance != null)
@@ -312,26 +314,22 @@ public class PlayerSkills : MonoBehaviour
 
         rb.velocity = new Vector2(dir * 20f, 0f);
 
-        // 6 Titik Tebasan Dimensi Silang di udara yang BERTATIKAN (Lingering Slashes)
         int hitCount = 6;
-        int sliceDmg = 25; // 6 x 25 = 150 damage tebasan awal
+        int sliceDmg = 25;
 
         float[] angles = new float[] { 15f, -35f, 60f, -60f, 40f, -10f };
         List<Vector3> lingeringSlashPositions = new List<Vector3>();
 
         for (int i = 0; i < hitCount; i++)
         {
-            // Bayangan ksatria merah-emas tertinggal di lintasan
             SpawnAfterimage(new Color(1f, 0.25f, 0.2f, 0.75f));
 
             Vector3 slashPos = transform.position + new Vector3(Random.Range(-1.0f, 2.8f) * dir, Random.Range(-0.5f, 1.5f), 0f);
             lingeringSlashPositions.Add(slashPos);
 
-            // Munculkan tebasan dimensi yang bertahan di udara (durasi lebih panjang menanti detonasi)
             SpawnVisualFX(slashPos, fxSlashCross, Vector3.one * Random.Range(1.8f, 2.4f), angles[i], 0.90f, new Color(1f, 0.95f, 0.8f, 0.95f));
             SpawnVisualFX(slashPos, fxSlashArc, Vector3.one * Random.Range(1.9f, 2.6f), -angles[i], 0.85f, new Color(1f, 0.85f, 0.3f, 0.9f));
 
-            // Damage tebasan awal
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, 6.0f, player.GetEnemyLayer());
             foreach (var hit in hits)
             {
@@ -345,38 +343,31 @@ public class PlayerSkills : MonoBehaviour
             yield return new WaitForSeconds(0.06f);
         }
 
-        // Hentikan laju ksatria di ujung lintasan
         rb.velocity = Vector2.zero;
 
-        // ── FASE 3: DRAMATIC DELAY / SUSPENSE (Kuda-Kuda Menyarungkan Pedang) ─
-        // Player diam tak bergerak di seberang, retakan dimensi berdenyut di udara...
-        float delayPopOut = 0.52f; // Jeda menegangkan sebelum meledak!
+        // ── FASE 3: DRAMATIC DELAY / SUSPENSE ─────────────────────────────────
+        float delayPopOut = 0.52f;
         if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(delayPopOut, 0.12f); // Getaran halus antisipasi
+            CameraFollow.instance.TriggerScreenShake(delayPopOut, 0.12f);
 
         yield return new WaitForSeconds(delayPopOut);
 
-        // ── FASE 4: POP-OUT FINISHER DETONATION ("CLINK!" & BOOM!) ───────────
-        // Suara sheathe clink tajam + dentuman ledakan dahsyat
+        // ── FASE 4: POP-OUT FINISHER DETONATION ───────────────────────────────
         if (sfxUltimatePop != null && audioSource != null)
             audioSource.PlayOneShot(sfxUltimatePop, 1.4f);
 
-        // Gempa layar dahsyat saat seluruh tebasan meledak serentak
         if (CameraFollow.instance != null)
             CameraFollow.instance.TriggerScreenShake(0.70f, 0.55f);
 
-        // Pop-out serentak di semua bekas tebasan yang tertinggal
         foreach (var pos in lingeringSlashPositions)
         {
             SpawnVisualFX(pos, fxSlashCross, Vector3.one * 2.4f, Random.Range(-45f, 45f), 0.35f, Color.white, true, 2.6f);
         }
 
-        // Detonasi ledakan raksasa di tengah arena
         Vector3 blastCenter = transform.position - new Vector3(dir * 2.0f, -0.4f, 0f);
         SpawnVisualFX(blastCenter, fxSlashCross, Vector3.one * 4.5f, 0f, 0.55f, Color.white, true, 3.5f);
         SpawnVisualFX(blastCenter, fxWhirlwind, Vector3.one * 3.2f, 0f, 0.55f, new Color(1f, 0.85f, 0.25f, 1f), true, 4.0f);
 
-        // FINISHER BURST DAMAGE: 150 Damage tambahan (Total 300 damage!) + Knockback terpental dahsyat!
         int finisherBurstDmg = 150;
         Collider2D[] finalHits = Physics2D.OverlapCircleAll(blastCenter, 7.5f, player.GetEnemyLayer());
         foreach (var hit in finalHits)
@@ -384,7 +375,7 @@ public class PlayerSkills : MonoBehaviour
             Entity enemy = hit.GetComponent<Entity>();
             if (enemy != null && enemy != player)
             {
-                enemy.TakeDamage(finisherBurstDmg, true); // applyKnockback = true!
+                enemy.TakeDamage(finisherBurstDmg, true);
             }
         }
 
@@ -393,6 +384,264 @@ public class PlayerSkills : MonoBehaviour
         player.SetInvincible(false);
         player.canMove = true;
         isCastingSkill = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ANIME CUT-IN ANIMATION - Slide masuk dari kanan seperti Mobile Legends
+    // ─────────────────────────────────────────────────────────────────────────
+    private IEnumerator ShowUltimateCutIn()
+    {
+        // ── 1. Buat Canvas khusus cut-in (sorting order 90, di atas gameplay) ──
+        GameObject canvasGO = new GameObject("UltimateCutIn_Canvas");
+        Canvas canvas = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 90;
+        CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        // ── 2. Screen flash putih kilat (efek aura sebelum banner muncul) ───────
+        GameObject flashGO = new GameObject("CutIn_Flash");
+        flashGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform flashRT = flashGO.AddComponent<RectTransform>();
+        flashRT.anchorMin = Vector2.zero;
+        flashRT.anchorMax = Vector2.one;
+        flashRT.sizeDelta = Vector2.zero;
+        flashRT.anchoredPosition = Vector2.zero;
+        Image flashImg = flashGO.AddComponent<Image>();
+        flashImg.color = new Color(1f, 0.95f, 0.7f, 0f);
+        flashImg.raycastTarget = false;
+
+        // Flash in
+        float fe = 0f;
+        while (fe < 0.08f)
+        {
+            fe += Time.unscaledDeltaTime;
+            flashImg.color = new Color(1f, 0.95f, 0.7f, Mathf.Lerp(0f, 0.55f, fe / 0.08f));
+            yield return null;
+        }
+        // Flash out
+        fe = 0f;
+        while (fe < 0.12f)
+        {
+            fe += Time.unscaledDeltaTime;
+            flashImg.color = new Color(1f, 0.95f, 0.7f, Mathf.Lerp(0.55f, 0f, fe / 0.12f));
+            yield return null;
+        }
+
+        // ── 3. Banner Panel Utama (Diagonal, lebar penuh seperti ML) ───────────
+        GameObject bannerGO = new GameObject("CutIn_Banner");
+        bannerGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform bannerRT = bannerGO.AddComponent<RectTransform>();
+        bannerRT.anchorMin = new Vector2(0f, 0.5f);
+        bannerRT.anchorMax = new Vector2(0f, 0.5f);
+        bannerRT.pivot     = new Vector2(0f, 0.5f);
+        bannerRT.sizeDelta = new Vector2(1300f, 300f);
+        // Mulai dari kanan layar (off-screen)
+        bannerRT.anchoredPosition = new Vector2(2200f, -60f);
+
+        Image bannerImg = bannerGO.AddComponent<Image>();
+        if (cutInBanner != null)
+            bannerImg.sprite = cutInBanner;
+        else
+            bannerImg.color = new Color(0.05f, 0.03f, 0.12f, 0.95f);
+        bannerImg.raycastTarget = false;
+
+        // ── 4. Dark overlay strip atas & bawah banner (gaya ML) ─────────────
+        GameObject topStripGO = new GameObject("CutIn_TopStrip");
+        topStripGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform topStripRT = topStripGO.AddComponent<RectTransform>();
+        topStripRT.anchorMin = new Vector2(0f, 0.5f);
+        topStripRT.anchorMax = new Vector2(1f, 0.5f);
+        topStripRT.pivot = new Vector2(0.5f, 0.5f);
+        topStripRT.sizeDelta = new Vector2(0f, 300f);
+        topStripRT.anchoredPosition = new Vector2(0f, -60f);
+        Image topStripImg = topStripGO.AddComponent<Image>();
+        topStripImg.color = new Color(0f, 0f, 0f, 0f);
+        topStripImg.raycastTarget = false;
+
+        // ── 5. Portrait foto karakter (pojok kiri banner) ─────────────────────
+        GameObject portraitGO = new GameObject("CutIn_Portrait");
+        portraitGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform portraitRT = portraitGO.AddComponent<RectTransform>();
+        portraitRT.anchorMin = new Vector2(0f, 0.5f);
+        portraitRT.anchorMax = new Vector2(0f, 0.5f);
+        portraitRT.pivot = new Vector2(0f, 0.5f);
+        portraitRT.sizeDelta = new Vector2(290f, 290f);
+        portraitRT.anchoredPosition = new Vector2(2200f, -55f); // Start off-screen bersama banner
+        Image portraitImg = portraitGO.AddComponent<Image>();
+        if (playerPortrait != null)
+            portraitImg.sprite = playerPortrait;
+        else
+        {
+            // Fallback: kotak emas solid jika portrait null
+            portraitImg.color = new Color(0.8f, 0.6f, 0.1f, 1f);
+        }
+        portraitImg.preserveAspect = true;
+        portraitImg.raycastTarget = false;
+
+        // ── 6. Portrait border frame (cincin emas mewah) ─────────────────────
+        GameObject frameGO = new GameObject("CutIn_PortraitFrame");
+        frameGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform frameRT = frameGO.AddComponent<RectTransform>();
+        frameRT.anchorMin = new Vector2(0f, 0.5f);
+        frameRT.anchorMax = new Vector2(0f, 0.5f);
+        frameRT.pivot = new Vector2(0f, 0.5f);
+        frameRT.sizeDelta = new Vector2(300f, 300f);
+        frameRT.anchoredPosition = new Vector2(2200f, -55f);
+        Image frameImg = frameGO.AddComponent<Image>();
+        frameImg.color = new Color(1f, 0.82f, 0.2f, 0f); // Frame emas, mulai transparan
+        frameImg.raycastTarget = false;
+
+        // ── 7. Nama skill text ("JUDGEMENT OF THE END") ───────────────────────
+        GameObject skillNameGO = new GameObject("CutIn_SkillName");
+        skillNameGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform skillNameRT = skillNameGO.AddComponent<RectTransform>();
+        skillNameRT.anchorMin = new Vector2(0f, 0.5f);
+        skillNameRT.anchorMax = new Vector2(0f, 0.5f);
+        skillNameRT.pivot = new Vector2(0f, 0.5f);
+        skillNameRT.sizeDelta = new Vector2(900f, 90f);
+        skillNameRT.anchoredPosition = new Vector2(3000f, -20f); // Off-screen lebih jauh
+
+        TextMeshProUGUI skillTMP = skillNameGO.AddComponent<TextMeshProUGUI>();
+        skillTMP.text = "JUDGEMENT OF THE END";
+        skillTMP.fontSize = 52f;
+        skillTMP.fontStyle = FontStyles.Bold | FontStyles.Italic;
+        skillTMP.alignment = TextAlignmentOptions.Left;
+        skillTMP.color = new Color(1f, 0.88f, 0.3f, 1f);
+        skillTMP.outlineColor = new Color32(80, 40, 0, 255);
+        skillTMP.outlineWidth = 0.25f;
+        skillTMP.margin = Vector4.zero;
+        skillTMP.raycastTarget = false;
+
+        // ── 8. Sub-text karakter ("VALE - KNIGHT OF ETERNITY") ───────────────
+        GameObject charNameGO = new GameObject("CutIn_CharName");
+        charNameGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform charNameRT = charNameGO.AddComponent<RectTransform>();
+        charNameRT.anchorMin = new Vector2(0f, 0.5f);
+        charNameRT.anchorMax = new Vector2(0f, 0.5f);
+        charNameRT.pivot = new Vector2(0f, 0.5f);
+        charNameRT.sizeDelta = new Vector2(900f, 50f);
+        charNameRT.anchoredPosition = new Vector2(3000f, -78f); // Start off-screen
+        TextMeshProUGUI charTMP = charNameGO.AddComponent<TextMeshProUGUI>();
+        charTMP.text = "KNIGHT OF ETERNITY";
+        charTMP.fontSize = 26f;
+        charTMP.fontStyle = FontStyles.Bold;
+        charTMP.alignment = TextAlignmentOptions.Left;
+        charTMP.color = new Color(0.9f, 0.75f, 0.95f, 1f); // Lavender muda
+        charTMP.margin = Vector4.zero;
+        charTMP.raycastTarget = false;
+
+        // ── 9. Gold accent line (garis emas horizontal) ───────────────────────
+        GameObject linGO = new GameObject("CutIn_GoldLine");
+        linGO.transform.SetParent(canvasGO.transform, false);
+        RectTransform linRT = linGO.AddComponent<RectTransform>();
+        linRT.anchorMin = new Vector2(0f, 0.5f);
+        linRT.anchorMax = new Vector2(0f, 0.5f);
+        linRT.pivot = new Vector2(0f, 0.5f);
+        linRT.sizeDelta = new Vector2(0f, 3f);
+        linRT.anchoredPosition = new Vector2(310f, -55f);
+        Image linImg = linGO.AddComponent<Image>();
+        linImg.color = new Color(1f, 0.85f, 0.2f, 0f);
+        linImg.raycastTarget = false;
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ANIMASI: Slide-In dari kanan, semua elemen simultan
+        // ══════════════════════════════════════════════════════════════════════
+
+        // Target posisi akhir (di layar)
+        Vector2 bannerTarget   = new Vector2(0f, -60f);
+        Vector2 portraitTarget = new Vector2(10f, -55f);
+        Vector2 frameTarget    = new Vector2(10f, -55f);
+        Vector2 skillTarget    = new Vector2(310f, -15f);
+        Vector2 charTarget     = new Vector2(310f, -78f);
+
+        // Offset mulai (off-screen kanan)
+        Vector2 bannerStart   = new Vector2(2200f, -60f);
+        Vector2 portraitStart = new Vector2(2200f, -55f);
+        Vector2 frameStart    = new Vector2(2200f, -55f);
+        Vector2 skillStart    = new Vector2(3000f, -15f);
+        Vector2 charStart     = new Vector2(3200f, -78f);
+
+        // Animasi strip top (fade in)
+        Color stripTargetColor = new Color(0f, 0f, 0f, 0.72f);
+
+        // Slide-In (0.22 detik — cepat & responsif)
+        float slideInDur = 0.22f;
+        float elapsed = 0f;
+        while (elapsed < slideInDur)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / slideInDur);
+
+            bannerRT.anchoredPosition   = Vector2.Lerp(bannerStart, bannerTarget, t);
+            portraitRT.anchoredPosition = Vector2.Lerp(portraitStart, portraitTarget, t);
+            frameRT.anchoredPosition    = Vector2.Lerp(frameStart, frameTarget, t);
+            skillNameRT.anchoredPosition = Vector2.Lerp(skillStart, skillTarget, t * 0.9f);
+            charNameRT.anchoredPosition  = Vector2.Lerp(charStart, charTarget, t * 0.85f);
+
+            // Strip fade
+            topStripImg.color = Color.Lerp(Color.clear, stripTargetColor, t);
+
+            // Frame emas muncul
+            frameImg.color = new Color(1f, 0.82f, 0.2f, Mathf.Lerp(0f, 0.9f, t));
+
+            yield return null;
+        }
+
+        // Snap ke posisi final
+        bannerRT.anchoredPosition    = bannerTarget;
+        portraitRT.anchoredPosition  = portraitTarget;
+        frameRT.anchoredPosition     = frameTarget;
+        skillNameRT.anchoredPosition = skillTarget;
+        charNameRT.anchoredPosition  = charTarget;
+        topStripImg.color = stripTargetColor;
+
+        // Gold line expand (garis emas muncul memanjang ke kanan)
+        float lineDur = 0.18f;
+        elapsed = 0f;
+        while (elapsed < lineDur)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = elapsed / lineDur;
+            linRT.sizeDelta = new Vector2(Mathf.Lerp(0f, 850f, t), 3f);
+            linImg.color = new Color(1f, 0.85f, 0.2f, Mathf.Lerp(0f, 1f, t));
+            yield return null;
+        }
+        linRT.sizeDelta = new Vector2(850f, 3f);
+
+        // ── TAHAN di layar (0.55 detik — cukup untuk baca nama skill) ─────────
+        yield return new WaitForSecondsRealtime(0.55f);
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ANIMASI: Slide-Out ke kiri (cepat 0.18 detik)
+        // ══════════════════════════════════════════════════════════════════════
+        Vector2 bannerExit   = new Vector2(-1500f, -60f);
+        Vector2 portraitExit = new Vector2(-400f, -55f);
+        Vector2 skillExit    = new Vector2(-1200f, -15f);
+        Vector2 charExit     = new Vector2(-1000f, -78f);
+
+        float slideOutDur = 0.18f;
+        elapsed = 0f;
+        while (elapsed < slideOutDur)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / slideOutDur);
+
+            bannerRT.anchoredPosition    = Vector2.Lerp(bannerTarget, bannerExit, t);
+            portraitRT.anchoredPosition  = Vector2.Lerp(portraitTarget, portraitExit, t);
+            frameRT.anchoredPosition     = Vector2.Lerp(frameTarget, portraitExit, t);
+            skillNameRT.anchoredPosition = Vector2.Lerp(skillTarget, skillExit, t);
+            charNameRT.anchoredPosition  = Vector2.Lerp(charTarget, charExit, t);
+            topStripImg.color = Color.Lerp(stripTargetColor, Color.clear, t);
+            linImg.color      = Color.Lerp(new Color(1f, 0.85f, 0.2f, 1f), Color.clear, t);
+            flashImg.color    = new Color(1f, 0.95f, 0.7f, 0f);
+            yield return null;
+        }
+
+        // Bersihkan canvas setelah selesai
+        Object.Destroy(canvasGO);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -410,12 +659,11 @@ public class PlayerSkills : MonoBehaviour
         SpriteRenderer sr = fxGO.AddComponent<SpriteRenderer>();
         sr.sprite = sprite;
         sr.color = color;
-        sr.sortingOrder = 55; // Di atas karakter dan background
+        sr.sortingOrder = 55;
 
-        // Material Additive agar efeknya menyala terang (Glow)
         Material glowMat = new Material(Shader.Find("Sprites/Default"));
         glowMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        glowMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive blending!
+        glowMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
         sr.material = glowMat;
 
         Vector3 targetScale = expand ? scale * endScaleMul : scale * 1.15f;
@@ -504,13 +752,11 @@ public class PlayerSkills : MonoBehaviour
         slotRT.anchoredPosition = new Vector2(xPos, 0f);
         slotRT.sizeDelta        = new Vector2(36f, 36f);
 
-        // Icon Image
         Image iconImg = slotGO.AddComponent<Image>();
         if (iconSprite != null) iconImg.sprite = iconSprite;
         else iconImg.color = new Color(0.2f, 0.2f, 0.25f, 1f);
         iconImg.raycastTarget = false;
 
-        // Cooldown Overlay (Gelap saat CD)
         GameObject cdGO = new GameObject("CD_Overlay");
         cdGO.transform.SetParent(slotGO.transform, false);
 
@@ -529,7 +775,6 @@ public class PlayerSkills : MonoBehaviour
 
         overlayOut = cdImg;
 
-        // Key Label Badge ("A", "S", "W")
         GameObject badgeGO = new GameObject("Key_Badge");
         badgeGO.transform.SetParent(slotGO.transform, false);
 
@@ -561,7 +806,6 @@ public class PlayerSkills : MonoBehaviour
         btTMP.raycastTarget = false;
         btTMP.margin = Vector4.zero;
 
-        // Cooldown Seconds Text
         GameObject cdTextGO = new GameObject("CD_Text");
         cdTextGO.transform.SetParent(slotGO.transform, false);
 
@@ -584,7 +828,6 @@ public class PlayerSkills : MonoBehaviour
 
     private void UpdateSkillUI()
     {
-        // Update Slot 1 [A]
         if (cdOverlay1 != null)
         {
             float pct = Mathf.Clamp01(skill1Timer / skill1Cooldown);
@@ -593,7 +836,6 @@ public class PlayerSkills : MonoBehaviour
                 cdText1.text = (skill1Timer > 0.1f) ? skill1Timer.ToString("F1") : "";
         }
 
-        // Update Slot 2 [S]
         if (cdOverlay2 != null)
         {
             float pct = Mathf.Clamp01(skill2Timer / skill2Cooldown);
@@ -602,7 +844,6 @@ public class PlayerSkills : MonoBehaviour
                 cdText2.text = (skill2Timer > 0.1f) ? skill2Timer.ToString("F1") : "";
         }
 
-        // Update Slot 3 [W]
         if (cdOverlay3 != null)
         {
             float pct = Mathf.Clamp01(skill3Timer / skill3Cooldown);
