@@ -25,6 +25,8 @@ public class VictoryManager : MonoBehaviour
     private Sprite btnPressed;
     private AudioClip sfxHover;
     private AudioClip sfxClick;
+    private AudioClip[] sfxStars;
+    private AudioClip sfxStarAll;
     private AudioSource audioSource;
 
     void Awake()
@@ -54,6 +56,12 @@ public class VictoryManager : MonoBehaviour
         btnPressed       = Resources.Load<Sprite>("UI/btn_fantasy_pressed");
         sfxHover         = Resources.Load<AudioClip>("Audio/ui_hover");
         sfxClick         = Resources.Load<AudioClip>("Audio/ui_click");
+
+        sfxStars = new AudioClip[3];
+        sfxStars[0] = Resources.Load<AudioClip>("Audio/star_1");
+        sfxStars[1] = Resources.Load<AudioClip>("Audio/star_2");
+        sfxStars[2] = Resources.Load<AudioClip>("Audio/star_3");
+        sfxStarAll  = Resources.Load<AudioClip>("Audio/star_all");
     }
 
     public void MunculkanMenang(float waktu)
@@ -471,10 +479,20 @@ public class VictoryManager : MonoBehaviour
         {
             if (stars[i] == null) continue;
 
-            // Efek suara pop bintang
-            if (audioSource != null && sfxClick != null)
+            // Efek suara denting bintang magis (nada bertingkat 1 -> 2 -> 3)
+            AudioClip clipToPlay = null;
+            if (sfxStars != null && i < sfxStars.Length && sfxStars[i] != null)
             {
-                audioSource.PlayOneShot(sfxClick, 0.60f);
+                clipToPlay = sfxStars[i];
+            }
+            else
+            {
+                clipToPlay = sfxClick;
+            }
+
+            if (audioSource != null && clipToPlay != null)
+            {
+                audioSource.PlayOneShot(clipToPlay, 0.90f);
             }
 
             // Ganti sprite dan beri warna emas menyala
@@ -498,6 +516,13 @@ public class VictoryManager : MonoBehaviour
 
             // Jeda antar bintang
             yield return new WaitForSecondsRealtime(delayInSeconds);
+        }
+
+        // Jika berhasil mendapatkan bintang (terutama 3 bintang), putar perayaan shimmer fanfare singkat
+        if (jumlahFix >= 3 && audioSource != null && sfxStarAll != null)
+        {
+            yield return new WaitForSecondsRealtime(0.2f);
+            audioSource.PlayOneShot(sfxStarAll, 0.85f);
         }
     }
 
