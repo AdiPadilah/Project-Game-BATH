@@ -41,6 +41,10 @@ public static class ForceReloadMenu
         {
             targetPath = "Assets/Scenes/About.unity";
         }
+        else if (activeScene.name == "GamePlay")
+        {
+            targetPath = "Assets/Scenes/GamePlay.unity";
+        }
 
         try
         {

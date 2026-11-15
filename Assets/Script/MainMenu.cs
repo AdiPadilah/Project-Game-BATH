@@ -681,8 +681,9 @@ public class MainMenu : MonoBehaviour
 
     public void kembali()
     {
+        Time.timeScale = 1f;
         Scene currentScene = SceneManager.GetActiveScene();
-        if (currentScene.name == "About")
+        if (currentScene.name == "About" || currentScene.name == "GamePlay")
         {
             SceneManager.LoadScene("Main Menu");
             return;

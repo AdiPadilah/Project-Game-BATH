@@ -358,6 +358,11 @@ public class BossAI : Entity
             rb.simulated = false;
         }
 
+        if (bossHealthBar != null)
+        {
+            bossHealthBar.gameObject.SetActive(false);
+        }
+
         StartCoroutine(MunculkanVictoryPanel());
         Destroy(gameObject, 5f);
     }
