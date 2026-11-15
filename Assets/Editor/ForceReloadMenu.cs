@@ -36,16 +36,41 @@ public static class ForceReloadMenu
 
         // Tandai scene tidak perlu disave (buang perubahan dari 0.backup)
         var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-        if (activeScene.isDirty)
+        string targetPath = "Assets/Scenes/Main Menu.unity";
+        if (activeScene.name == "About")
         {
-            EditorSceneManager.MarkSceneDirty(activeScene);
+            targetPath = "Assets/Scenes/About.unity";
         }
 
         try
         {
             AssetDatabase.Refresh();
-            EditorSceneManager.OpenScene("Assets/Scenes/Main Menu.unity", OpenSceneMode.Single);
-            Debug.Log("<color=cyan>[ForceReloadMenu] ✓ Main Menu.unity berhasil di-reload dari disk!</color>");
+            EditorSceneManager.OpenScene(targetPath, OpenSceneMode.Single);
+            Debug.Log($"<color=cyan>[ForceReloadMenu] ✓ {System.IO.Path.GetFileName(targetPath)} berhasil di-reload dari disk!</color>");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError("[ForceReloadMenu] GAGAL reload: " + ex.Message);
+        }
+    }
+
+    [MenuItem("Tools/RELOAD SCENE AKTIF DARI DISK")]
+    public static void ReloadActiveScene()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning("[ForceReloadMenu] Stop Play Mode dulu!");
+            return;
+        }
+
+        var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        if (string.IsNullOrEmpty(activeScene.path)) return;
+
+        try
+        {
+            AssetDatabase.Refresh();
+            EditorSceneManager.OpenScene(activeScene.path, OpenSceneMode.Single);
+            Debug.Log($"<color=cyan>[ForceReloadMenu] ✓ {activeScene.name}.unity berhasil di-reload dari disk!</color>");
         }
         catch (System.Exception ex)
         {

@@ -52,6 +52,7 @@ public class MainMenu : MonoBehaviour
         SetupDynamicBackground();
         FixMenuLayout();
         FixBiodataLayout();
+        FixAboutLayout();
         SpawnFloatingEmbers();
         SpawnDragonMouthSparks();
         SpawnDesertSandWind();
@@ -75,6 +76,7 @@ public class MainMenu : MonoBehaviour
     void BuildAtmosphere()
     {
         Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = FindObjectOfType<Canvas>();
         if (canvas == null) return;
 
         // 1. Fullscreen cinematic vignette
@@ -452,6 +454,59 @@ public class MainMenu : MonoBehaviour
         Debug.Log("<color=cyan>[MainMenu] Layout Biodata diperindah sempurna!</color>");
     }
 
+    void FixAboutLayout()
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = FindObjectOfType<Canvas>();
+        if (canvas == null) return;
+
+        Transform panel = canvas.transform.Find("AboutPanel");
+        if (panel == null) return;
+
+        // 1. Frame Modal Panel
+        Image panelImg = panel.GetComponent<Image>();
+        if (panelImg != null && modalPanelSprite != null)
+        {
+            panelImg.sprite = modalPanelSprite;
+            panelImg.type   = Image.Type.Sliced;
+            panelImg.color  = Color.white;
+        }
+
+        // 2. Tombol Kembali di dalam About
+        Transform backBtn = panel.Find("Button");
+        if (backBtn != null)
+        {
+            Image btnImg = backBtn.GetComponent<Image>();
+            if (btnImg != null && btnNormal != null)
+            {
+                btnImg.sprite = btnNormal;
+                btnImg.type   = Image.Type.Sliced;
+                btnImg.color  = Color.white;
+            }
+
+            Button btn = backBtn.GetComponent<Button>();
+            if (btn != null)
+            {
+                btn.transition = Selectable.Transition.SpriteSwap;
+                SpriteState ss = btn.spriteState;
+                ss.highlightedSprite = btnHover;
+                ss.pressedSprite     = btnPressed;
+                ss.selectedSprite    = btnHover;
+                btn.spriteState      = ss;
+
+                btn.onClick.RemoveListener(PlayClickSound);
+                btn.onClick.AddListener(PlayClickSound);
+
+                btn.onClick.RemoveListener(kembali);
+                btn.onClick.AddListener(kembali);
+            }
+
+            AddHoverEffect(backBtn.gameObject);
+        }
+
+        Debug.Log("<color=cyan>[MainMenu] Layout About diperindah sempurna!</color>");
+    }
+
     void PlayClickSound()
     {
         if (audioSource != null && sfxClick != null)
@@ -460,8 +515,14 @@ public class MainMenu : MonoBehaviour
         }
     }
 
+    void OnDisable()
+    {
+        StopAllCoroutines();
+    }
+
     void AddHoverEffect(GameObject go)
     {
+        if (go == null) return;
         EventTrigger trigger = go.GetComponent<EventTrigger>();
         if (trigger == null) trigger = go.AddComponent<EventTrigger>();
         trigger.triggers.Clear();
@@ -469,6 +530,7 @@ public class MainMenu : MonoBehaviour
         EventTrigger.Entry enter = new EventTrigger.Entry();
         enter.eventID = EventTriggerType.PointerEnter;
         enter.callback.AddListener((data) => {
+            if (!isActiveAndEnabled || !gameObject.activeInHierarchy || go == null) return;
             if (audioSource != null && sfxHover != null)
             {
                 audioSource.PlayOneShot(sfxHover, 0.22f);
@@ -481,6 +543,7 @@ public class MainMenu : MonoBehaviour
         EventTrigger.Entry exit = new EventTrigger.Entry();
         exit.eventID = EventTriggerType.PointerExit;
         exit.callback.AddListener((data) => {
+            if (!isActiveAndEnabled || !gameObject.activeInHierarchy || go == null) return;
             StopAllCoroutines();
             StartCoroutine(AnimateScale(go.transform, 1.00f, 0.12f));
         });
@@ -495,7 +558,7 @@ public class MainMenu : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            if (tr == null) yield break;
+            if (tr == null || !isActiveAndEnabled) yield break;
             elapsed += Time.unscaledDeltaTime;
             tr.localScale = Vector3.Lerp(start, end, elapsed / duration);
             yield return null;
@@ -618,12 +681,22 @@ public class MainMenu : MonoBehaviour
 
     public void kembali()
     {
+        Scene currentScene = SceneManager.GetActiveScene();
+        if (currentScene.name == "About")
+        {
+            SceneManager.LoadScene("Main Menu");
+            return;
+        }
+
         Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = FindObjectOfType<Canvas>();
         if (canvas != null)
         {
             Transform opt = canvas.transform.Find("Options Menu");
             if (opt != null) opt.gameObject.SetActive(false);
-            gameObject.SetActive(true);
+            Transform mm = canvas.transform.Find("Main Menu");
+            if (mm != null) mm.gameObject.SetActive(true);
+            else gameObject.SetActive(true);
         }
         else
         {
