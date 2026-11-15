@@ -9,7 +9,7 @@ public class BossAI : Entity
     public float stopDistance = 1.5f;
 
     [Header("Visual & Size")]
-    public float bossScale = 3.2f;
+    public float bossScale = 2.2f;
     [Header("Attack")]
     public float attackRange = 3f;
     public float attackCooldown = 2f;
@@ -57,15 +57,17 @@ public class BossAI : Entity
 
         if (sr != null) originalColor = sr.color;
 
-        // Pertahankan skala boss dari scene agar tidak berubah saat runtime
+        // Pertahankan skala boss dari scene (proporsional 2.2)
         if (Mathf.Abs(transform.localScale.y) > 0.1f)
         {
             bossScale = Mathf.Abs(transform.localScale.y);
         }
         else
         {
-            bossScale = 3.2f;
+            bossScale = 2.2f;
         }
+
+        bossScale = Mathf.Clamp(bossScale, 1.8f, 2.5f);
 
         if (roarSound == null)
         {
@@ -78,6 +80,24 @@ public class BossAI : Entity
         {
             bossHealthBar.maxValue = maxHealth;
             bossHealthBar.value = maxHealth; // Pastikan Slider langsung penuh
+        }
+    }
+
+    protected virtual void Start()
+    {
+        SnapToGround();
+    }
+
+    private void SnapToGround()
+    {
+        // Pastikan boss sudah menapak di tanah sejak awal agar tidak jatuh dari atas
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 30f, whatIsGround);
+        if (hit.collider != null)
+        {
+            Collider2D bossCol = GetComponent<Collider2D>();
+            float bottomOffset = bossCol != null ? bossCol.bounds.extents.y : 1.4f;
+            transform.position = new Vector3(transform.position.x, hit.point.y + bottomOffset, transform.position.z);
+            if (rb != null) rb.velocity = Vector2.zero;
         }
     }
 
@@ -106,10 +126,11 @@ public class BossAI : Entity
         // Flip logic menggunakan bossScale (hanya saat tidak sedang menyerang)
         if (!isAttacking)
         {
+            float s = Mathf.Clamp(bossScale, 1.8f, 2.5f);
             if (dir > 0.1f)
-                transform.localScale = new Vector3(-bossScale, bossScale, 1f);
+                transform.localScale = new Vector3(-s, s, 1f);
             else if (dir < -0.1f)
-                transform.localScale = new Vector3(bossScale, bossScale, 1f);
+                transform.localScale = new Vector3(s, s, 1f);
         }
 
         if (isAttacking)
@@ -307,8 +328,7 @@ public class BossAI : Entity
 
     public void PlayRoar()
     {
-        // Pastikan skala boss sesuai setting scene (minimal 3.2)
-        bossScale = Mathf.Max(bossScale, 3.2f);
+        bossScale = Mathf.Clamp(bossScale, 1.8f, 2.5f);
 
         if (anim != null)
         {
@@ -325,10 +345,11 @@ public class BossAI : Entity
         if (player != null)
         {
             float dir = player.position.x - transform.position.x;
+            float s = Mathf.Clamp(bossScale, 1.8f, 2.5f);
             if (dir > 0.1f)
-                transform.localScale = new Vector3(-bossScale, bossScale, 1f);
+                transform.localScale = new Vector3(-s, s, 1f);
             else if (dir < -0.1f)
-                transform.localScale = new Vector3(bossScale, bossScale, 1f);
+                transform.localScale = new Vector3(s, s, 1f);
         }
 
         StartCoroutine(RoarEffectRoutine());
@@ -336,20 +357,41 @@ public class BossAI : Entity
 
     private IEnumerator RoarEffectRoutine()
     {
-        // Efek visual dramatis kobaran api merah/oranye saat mengaum
+        // Efek visual intimidasi merah membara saat mengaum
         if (sr != null)
         {
             float elapsed = 0f;
-            Color fieryColor = new Color(1.3f, 0.6f, 0.3f, 1f);
+            Color intimidatingColor = new Color(1.8f, 0.25f, 0.15f, 1f);
             while (elapsed < 1.8f)
             {
                 elapsed += Time.deltaTime;
-                float pulse = (Mathf.Sin(elapsed * 12f) + 1f) * 0.5f;
-                sr.color = Color.Lerp(originalColor, fieryColor, 0.5f + pulse * 0.5f);
+                float pulse = (Mathf.Sin(elapsed * 14f) + 1f) * 0.5f;
+                sr.color = Color.Lerp(originalColor, intimidatingColor, 0.35f + pulse * 0.65f);
                 yield return null;
             }
             sr.color = originalColor;
         }
+
+        if (bossHealthBar != null)
+        {
+            StartCoroutine(AnimateHealthBarFill());
+        }
+    }
+
+    private IEnumerator AnimateHealthBarFill()
+    {
+        if (bossHealthBar == null) yield break;
+        bossHealthBar.maxValue = maxHealth;
+        bossHealthBar.value = 0;
+        float fillDuration = 0.6f;
+        float t = 0f;
+        while (t < fillDuration)
+        {
+            t += Time.deltaTime;
+            bossHealthBar.value = Mathf.Lerp(0, maxHealth, t / fillDuration);
+            yield return null;
+        }
+        bossHealthBar.value = maxHealth;
     }
 
     public void ActivateBoss()

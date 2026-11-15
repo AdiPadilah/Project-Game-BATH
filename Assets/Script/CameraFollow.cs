@@ -6,9 +6,9 @@ public class CameraFollow : MonoBehaviour
     public static CameraFollow instance;
 
     public Transform target;
-    public Transform overrideTarget;      // Target override saat cutscene
+    public Transform overrideTarget;      // Target override saat cutscene (Boss)
     public float smoothSpeed = 5f;
-    public float cutsceneZoomSize = 4.0f; // Zoom saat menyorot boss (lebih dekat)
+    public float cutsceneZoomSize = 7.0f; // Fokus sinematik anggun (tidak zoom terlalu dekat, default camera 8.0)
 
     private float fixedY;
     private float defaultOrthographicSize = 8f;
@@ -38,28 +38,26 @@ public class CameraFollow : MonoBehaviour
         Transform currentFollow = overrideTarget != null ? overrideTarget : target;
         if (currentFollow == null) return;
 
-        // Saat cutscene boss: ikuti posisi Y boss juga biar lebih dramatis
-        float targetY = overrideTarget != null
-            ? Mathf.Lerp(fixedY, overrideTarget.position.y + 1.0f, 0.65f)
-            : fixedY;
+        // Pertahankan kamera tetap rata dengan lantai agar pemandangan tidak melonjak ke atas
+        float targetY = fixedY;
 
         Vector3 newPos = new Vector3(currentFollow.position.x, targetY, transform.position.z);
 
         Vector3 smoothedPos = Vector3.Lerp(transform.position, newPos,
-                                           smoothSpeed * Time.unscaledDeltaTime);
+                                           smoothSpeed * Time.deltaTime);
 
-        // Zoom dramatis saat cutscene boss, zoom out ke default setelah selesai
+        // Zoom lembut saat cutscene boss (7.0f), dan kembali halus ke default (8.0f)
         if (cam != null)
         {
             float targetSize = overrideTarget != null ? cutsceneZoomSize : defaultOrthographicSize;
             cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize,
-                                              smoothSpeed * Time.unscaledDeltaTime);
+                                              smoothSpeed * Time.deltaTime);
         }
 
         // Screen shake
         if (shakeTimer > 0)
         {
-            shakeTimer -= Time.unscaledDeltaTime;
+            shakeTimer -= Time.deltaTime;
             Vector2 randomShake = Random.insideUnitCircle * shakeMagnitude;
             smoothedPos += new Vector3(randomShake.x, randomShake.y, 0f);
         }

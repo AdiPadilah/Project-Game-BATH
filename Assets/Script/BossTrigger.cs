@@ -5,7 +5,7 @@ using System.Collections;
 public class BossTrigger : MonoBehaviour
 {
     [SerializeField] private BossAI boss;
-    [SerializeField] private float roarDuration = 2.2f;
+    [SerializeField] private float roarDuration = 1.8f;
 
     private bool hasTriggered = false;
 
@@ -21,18 +21,17 @@ public class BossTrigger : MonoBehaviour
 
     private IEnumerator BossIntroCutscene(Player player)
     {
-        // ===== FASE 0: KUNCI PLAYER =====
-        Rigidbody2D prb = null;
+        // 1. Kunci kontrol Player dan posisikan menghadap Boss
         if (player != null)
         {
             player.canMove = false;
-            prb = player.GetComponent<Rigidbody2D>();
-            if (prb != null) prb.velocity = Vector2.zero;
+            Rigidbody2D prb = player.GetComponent<Rigidbody2D>();
+            if (prb != null) prb.velocity = new Vector2(0f, prb.velocity.y);
 
             Animator panim = player.GetComponentInChildren<Animator>();
             if (panim != null) panim.SetFloat("xVelocity", 0f);
 
-            // Hadapkan player ke boss
+            // Hadapkan player ke arah boss
             if (boss != null)
             {
                 float d = boss.transform.position.x - player.transform.position.x;
@@ -41,112 +40,85 @@ public class BossTrigger : MonoBehaviour
             }
         }
 
-        // ===== FASE 1: BUAT LETTERBOX HITAM =====
+        // 2. Munculkan letterbox hitam sinematik halus
         Image topBar = null, botBar = null;
         GameObject overlay = CreateLetterbox(out topBar, out botBar);
-        yield return StartCoroutine(AnimateLetterbox(topBar, botBar, 0f, 1f, 0.45f));
+        yield return StartCoroutine(AnimateLetterbox(topBar, botBar, 0f, 1f, 0.4f));
 
-        // ===== FASE 2: KAMERA MELESAT KE BOSS =====
+        // 3. Kamera menyorot ke Boss yang sedang DIAM / IDLE di tanah
         if (CameraFollow.instance != null && boss != null)
         {
-            CameraFollow.instance.smoothSpeed = 22f;
+            CameraFollow.instance.smoothSpeed = 4.5f;
             CameraFollow.instance.overrideTarget = boss.transform;
         }
 
-        // Boss mulai dari ukuran sangat kecil (muncul secara dramatis)
-        Vector3 bossTargetScale = boss != null ? boss.transform.localScale : Vector3.one;
-        float bossScaleAbs = Mathf.Abs(bossTargetScale.y);
-        float xSign = Mathf.Sign(bossTargetScale.x);
+        // Jeda sejenak kamera membingkai Boss yang sedang berdiri tenang (membangun atmosfer tegang)
+        yield return new WaitForSeconds(0.8f);
+
+        // 4. Boss MENGAMUK / BERTERIAK dengan Efek Intimidasi!
         if (boss != null)
-            boss.transform.localScale = new Vector3(xSign * bossScaleAbs * 0.05f,
-                                                    bossScaleAbs * 0.05f, 1f);
+        {
+            boss.PlayRoar();
+        }
 
-        yield return new WaitForSeconds(0.25f);
-
-        // ===== FASE 3: DRAMATIC PAUSE — SLOW MOTION =====
-        Time.timeScale = 0.15f;
-        yield return new WaitForSecondsRealtime(0.4f);
-        Time.timeScale = 1f;
-
-        // ===== FASE 4: BOSS TUMBUH ELASTIC (kecil → penuh dengan overshoot) =====
-        yield return StartCoroutine(BossGrowIn(boss, bossScaleAbs, xSign, 0.6f));
-
-        // Zoom kamera lebih dekat ke boss
+        // Efek guncangan layar intimidasi
         if (CameraFollow.instance != null)
-            CameraFollow.instance.cutsceneZoomSize = 4.0f;
+        {
+            CameraFollow.instance.TriggerScreenShake(1.6f, 0.35f);
+        }
 
-        yield return new WaitForSeconds(0.2f);
+        // Efek aura intimidasi merah gelap di border layar
+        if (topBar != null && botBar != null)
+        {
+            StartCoroutine(IntimidationFlash(topBar, botBar));
+        }
 
-        // ===== FASE 5: BOSS MENGAUM + GUNCANGAN BERLAPIS =====
-        if (boss != null) boss.PlayRoar();
+        // Tunggu auman selesai
+        yield return new WaitForSeconds(roarDuration);
 
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.5f, 0.45f);
-
-        yield return new WaitForSeconds(0.35f);
-
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(1.5f, 0.55f);
-
-        // Flash letterbox merah sebentar (boss mengancam)
-        Color red = new Color(0.4f, 0f, 0f, 0.95f);
-        Color blk = new Color(0f, 0f, 0f, 0.95f);
-        if (topBar != null) topBar.color = red;
-        if (botBar != null) botBar.color = red;
-        yield return new WaitForSeconds(0.22f);
-        if (topBar != null) topBar.color = blk;
-        if (botBar != null) botBar.color = blk;
-
-        yield return new WaitForSeconds(roarDuration - 0.6f);
-
-        // ===== FASE 6: KAMERA BALIK KE PLAYER =====
+        // 5. Kamera kembali menyorot ke arah Player
         if (CameraFollow.instance != null)
         {
             CameraFollow.instance.overrideTarget = null;
-            CameraFollow.instance.smoothSpeed = 10f;
-            CameraFollow.instance.cutsceneZoomSize = 5.5f;
+            CameraFollow.instance.smoothSpeed = 5.0f;
         }
 
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(0.6f);
 
-        // ===== FASE 7: LETTERBOX KELUAR =====
-        yield return StartCoroutine(AnimateLetterbox(topBar, botBar, 1f, 0f, 0.4f));
+        // 6. Letterbox keluar dan kontrol pemain dikembalikan
+        yield return StartCoroutine(AnimateLetterbox(topBar, botBar, 1f, 0f, 0.35f));
         if (overlay != null) Destroy(overlay);
 
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.smoothSpeed = 5f;
+        if (player != null)
+        {
+            player.canMove = true;
+        }
 
-        // ===== FASE 8: MULAI FIGHT =====
-        if (player != null) player.canMove = true;
-        if (boss != null) boss.ActivateBoss();
+        // 7. Boss baru mulai berjalan dan bertarung!
+        if (boss != null)
+        {
+            boss.ActivateBoss();
+        }
     }
 
-    // ─── Boss tumbuh dari kecil ke besar dengan Elastic Out ───
-    private IEnumerator BossGrowIn(BossAI bossAI, float targetScale, float xSign, float duration)
+    private IEnumerator IntimidationFlash(Image top, Image bot)
     {
-        if (bossAI == null) yield break;
+        Color darkRed = new Color(0.45f, 0.05f, 0.05f, 0.95f);
+        Color black = new Color(0f, 0f, 0f, 0.95f);
         float elapsed = 0f;
-        float startScale = targetScale * 0.05f;
-        while (elapsed < duration)
+        while (elapsed < 1.4f)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            float s = Mathf.Lerp(startScale, targetScale, ElasticOut(t));
-            bossAI.transform.localScale = new Vector3(xSign * s, s, 1f);
+            float pulse = (Mathf.Sin(elapsed * 14f) + 1f) * 0.5f;
+            Color c = Color.Lerp(black, darkRed, pulse * 0.75f);
+            if (top != null) top.color = c;
+            if (bot != null) bot.color = c;
             yield return null;
         }
-        bossAI.transform.localScale = new Vector3(xSign * targetScale, targetScale, 1f);
+        if (top != null) top.color = black;
+        if (bot != null) bot.color = black;
     }
 
-    private float ElasticOut(float t)
-    {
-        if (t <= 0f) return 0f;
-        if (t >= 1f) return 1f;
-        const float c4 = (2f * Mathf.PI) / 3f;
-        return Mathf.Pow(2f, -10f * t) * Mathf.Sin((t * 10f - 0.75f) * c4) + 1f;
-    }
-
-    // ─── Buat letterbox hitam atas & bawah ───
     private GameObject CreateLetterbox(out Image top, out Image bot)
     {
         top = null; bot = null;
@@ -179,7 +151,7 @@ public class BossTrigger : MonoBehaviour
         rt.anchorMin = isTop ? new Vector2(0, 1) : new Vector2(0, 0);
         rt.anchorMax = isTop ? new Vector2(1, 1) : new Vector2(1, 0);
         rt.pivot     = isTop ? new Vector2(0.5f, 1) : new Vector2(0.5f, 0);
-        rt.sizeDelta = new Vector2(0, Screen.height * 0.13f);
+        rt.sizeDelta = new Vector2(0, Screen.height * 0.12f);
         return img;
     }
 
@@ -188,7 +160,7 @@ public class BossTrigger : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < dur)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += Time.deltaTime;
             float a = Mathf.Lerp(from, to, elapsed / dur) * 0.95f;
             Color c = new Color(0f, 0f, 0f, a);
             if (top != null) top.color = c;
