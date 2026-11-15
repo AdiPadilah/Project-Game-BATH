@@ -15,6 +15,10 @@ public class MainMenu : MonoBehaviour
     private Sprite screenVignette;
     private Sprite fireGlowSprite;
 
+    private AudioClip sfxHover;
+    private AudioClip sfxClick;
+    private AudioSource audioSource;
+
     // Komponen Dynamic Background
     private RectTransform bgRect;
     private Vector2 bgBasePos;
@@ -23,6 +27,16 @@ public class MainMenu : MonoBehaviour
     private RectTransform fireGlowRect;
     private Image sunHaloImg;
     private RectTransform sunHaloRect;
+
+    void Awake()
+    {
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+        }
+    }
 
     void Start()
     {
@@ -42,6 +56,9 @@ public class MainMenu : MonoBehaviour
         leftVignette   = Resources.Load<Sprite>("UI/menu_left_vignette");
         screenVignette = Resources.Load<Sprite>("UI/screen_vignette");
         fireGlowSprite = Resources.Load<Sprite>("UI/fire_glow");
+
+        sfxHover       = Resources.Load<AudioClip>("Audio/ui_hover");
+        sfxClick       = Resources.Load<AudioClip>("Audio/ui_click");
     }
 
     void BuildAtmosphere()
@@ -101,17 +118,15 @@ public class MainMenu : MonoBehaviour
             if (bgRect != null)
             {
                 bgBasePos = bgRect.anchoredPosition;
-                // Skala sedikit agar saat drifting tidak ada tepi hitam
                 bgRect.localScale = new Vector3(1.06f, 1.06f, 1f);
 
-                // Tambahkan efek cahaya api di mulut naga
+                // Cahaya api di mulut naga
                 if (fireGlowSprite != null && bgT.Find("Dragon_Fire_Glow") == null)
                 {
                     GameObject glowGO = new GameObject("Dragon_Fire_Glow");
                     glowGO.transform.SetParent(bgT, false);
 
                     fireGlowRect = glowGO.AddComponent<RectTransform>();
-                    // Posisi mulut naga (sekitar x=0.594, y=0.463 dari background)
                     fireGlowRect.anchorMin = new Vector2(0.594f, 0.463f);
                     fireGlowRect.anchorMax = new Vector2(0.594f, 0.463f);
                     fireGlowRect.pivot     = new Vector2(0.5f, 0.5f);
@@ -124,7 +139,7 @@ public class MainMenu : MonoBehaviour
                     fireGlowImg.raycastTarget = false;
                 }
 
-                // Tambahkan efek denyut cahaya halo matahari di langit
+                // Denyut cahaya halo matahari
                 if (fireGlowSprite != null && bgT.Find("Sun_Halo_Glow") == null)
                 {
                     GameObject haloGO = new GameObject("Sun_Halo_Glow");
@@ -158,13 +173,13 @@ public class MainMenu : MonoBehaviour
 
         float t = Time.time;
 
-        // 1. Ken Burns Cinematic Drift: kamera melayang pelan mengikuti naga
+        // 1. Ken Burns Cinematic Drift
         float driftX = Mathf.Sin(t * 0.22f) * 14f;
         float driftY = Mathf.Cos(t * 0.18f) * 8f;
         float zoom   = 1.06f + Mathf.Sin(t * 0.12f) * 0.015f;
         bgRect.localScale = new Vector3(zoom, zoom, 1f);
 
-        // 2. Interactive Mouse Parallax: background bergeser halus mengikuti gerakan kursor mouse
+        // 2. Interactive Mouse Parallax
         Vector2 mouseNorm = Vector2.zero;
         if (Screen.width > 0 && Screen.height > 0)
         {
@@ -183,7 +198,6 @@ public class MainMenu : MonoBehaviour
     {
         float t = Time.time;
 
-        // Api di mulut naga berkedip dan bernapas hidup
         if (fireGlowImg != null && fireGlowRect != null)
         {
             float flicker = Mathf.PerlinNoise(t * 5.5f, 0f);
@@ -194,7 +208,6 @@ public class MainMenu : MonoBehaviour
             fireGlowImg.color = new Color(1f, 0.65f, 0.18f, alpha);
         }
 
-        // Halo matahari di langit berdenyut halus
         if (sunHaloImg != null && sunHaloRect != null)
         {
             float pulse = Mathf.Sin(t * 1.2f) * 0.5f + 0.5f;
@@ -274,6 +287,10 @@ public class MainMenu : MonoBehaviour
                     cb.pressedColor     = new Color(1.5f, 0.9f, 0.3f, 1f);
                     btn.colors = cb;
                 }
+
+                // Audio click SFX
+                btn.onClick.RemoveListener(PlayClickSound);
+                btn.onClick.AddListener(PlayClickSound);
             }
 
             AddHoverEffect(btnT.gameObject);
@@ -304,6 +321,14 @@ public class MainMenu : MonoBehaviour
         Debug.Log("<color=gold>[MainMenu] Semua tombol dan teks berhasil diluruskan presisi!</color>");
     }
 
+    void PlayClickSound()
+    {
+        if (audioSource != null && sfxClick != null)
+        {
+            audioSource.PlayOneShot(sfxClick, 0.55f);
+        }
+    }
+
     void AddHoverEffect(GameObject go)
     {
         EventTrigger trigger = go.GetComponent<EventTrigger>();
@@ -313,6 +338,10 @@ public class MainMenu : MonoBehaviour
         EventTrigger.Entry enter = new EventTrigger.Entry();
         enter.eventID = EventTriggerType.PointerEnter;
         enter.callback.AddListener((data) => {
+            if (audioSource != null && sfxHover != null)
+            {
+                audioSource.PlayOneShot(sfxHover, 0.22f);
+            }
             StopAllCoroutines();
             StartCoroutine(AnimateScale(go.transform, 1.04f, 0.12f));
         });
@@ -381,7 +410,6 @@ public class MainMenu : MonoBehaviour
         if (GameObject.Find("Dragon_Mouth_Sparks") != null) return;
 
         GameObject sparkGO = new GameObject("Dragon_Mouth_Sparks");
-        // Posisi tepat di mulut naga di 2D/3D space
         sparkGO.transform.position = new Vector3(1.8f, -0.6f, 0f);
 
         ParticleSystem ps = sparkGO.AddComponent<ParticleSystem>();
@@ -402,12 +430,11 @@ public class MainMenu : MonoBehaviour
         var emission = ps.emission;
         emission.rateOverTime = 8f;
 
-        // Semburkan percikan api ke arah kiri-atas (melawan arah terbang naga)
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle     = 25f;
         shape.radius    = 0.15f;
-        shape.rotation  = new Vector3(0f, 0f, 160f); // Arahkan ke kiri
+        shape.rotation  = new Vector3(0f, 0f, 160f);
 
         var renderer = sparkGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 6;
