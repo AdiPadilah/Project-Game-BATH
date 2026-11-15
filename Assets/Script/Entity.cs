@@ -80,7 +80,7 @@ public class Entity : MonoBehaviour
         HandleFlip();
     }
 
-    public virtual void TakeDamage(int damage = 1)
+    public virtual void TakeDamage(int damage = 1, bool applyStun = false)
     {
         if (UI.instance != null && UI.instance.isGameOver) return;
         if (isInvincible) return;
@@ -89,7 +89,13 @@ public class Entity : MonoBehaviour
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         PlayDamageFeedback();
-        ApplyKnockback();
+
+        // Efek stun / knockback HANYA diberikan jika applyStun = true (khusus combo finisher)
+        if (applyStun)
+        {
+            ApplyKnockback();
+        }
+
         StartCoroutine(InvincibleCoroutine());
 
         OnHealthChanged();

@@ -248,7 +248,7 @@ public class BossAI : Entity
         }
     }
 
-    public override void TakeDamage(int dmg)
+    public override void TakeDamage(int dmg, bool applyStun = false)
     {
         if (isDead || isTakingDamage) return;
         if (UI.instance != null && UI.instance.isGameOver) return;
@@ -256,24 +256,40 @@ public class BossAI : Entity
         if (audioSource != null && hitSound != null)
             audioSource.PlayOneShot(hitSound);
 
-        isTakingDamage = true;
-        isAttacking = false; // Batalkan status attack agar boss tidak stuck setelah kena hit
-        if (attackTimeoutCoroutine != null)
-            StopCoroutine(attackTimeoutCoroutine);
-
         currentHealth -= dmg;
 
         // Update UI Slider saat kena damage
         if (bossHealthBar != null)
             bossHealthBar.value = currentHealth;
 
-        if (anim != null)
-            anim.SetTrigger("Hit");
+        // EFEK STUN / HIT FLINCH: HANYA jika serangan berupa kombo finisher!
+        if (applyStun)
+        {
+            isTakingDamage = true;
+            isAttacking = false; // Batalkan status attack saat terkena kombo stun
+            if (attackTimeoutCoroutine != null)
+                StopCoroutine(attackTimeoutCoroutine);
 
-        StartCoroutine(HitRoutine());
+            if (anim != null)
+                anim.SetTrigger("Hit");
+
+            StartCoroutine(HitRoutine());
+        }
+        else
+        {
+            // Basic attack biasa: berikan damage dan feedback flash visual singkat, tanpa menghentikan/men-stun bos
+            StartCoroutine(DamageFlashOnly());
+        }
 
         if (currentHealth <= 0)
             Die();
+    }
+
+    private IEnumerator DamageFlashOnly()
+    {
+        if (sr != null) sr.color = hitColor;
+        yield return new WaitForSeconds(hitDuration);
+        if (sr != null) sr.color = originalColor;
     }
 
     IEnumerator HitRoutine()

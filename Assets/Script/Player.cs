@@ -392,7 +392,9 @@ public class Player : Entity
                     }
                 }
 
-                enemy.TakeDamage(damage);
+                // Efek stun/knockback HANYA diberikan jika serangan berupa combo finisher (step 4)
+                bool applyStun = (currentComboStep == 4);
+                enemy.TakeDamage(damage, applyStun);
             }
         }
     }
