@@ -14,6 +14,7 @@ public class MainMenu : MonoBehaviour
     private Sprite leftVignette;
     private Sprite screenVignette;
     private Sprite fireGlowSprite;
+    private Sprite sunsetRaysSprite;
 
     private AudioClip sfxHover;
     private AudioClip sfxClick;
@@ -21,12 +22,17 @@ public class MainMenu : MonoBehaviour
 
     // Komponen Dynamic Background
     private RectTransform bgRect;
+    private Image bgImage;
     private Vector2 bgBasePos;
     private Vector2 currentParallax;
+
+    // Efek Visual
     private Image fireGlowImg;
     private RectTransform fireGlowRect;
     private Image sunHaloImg;
     private RectTransform sunHaloRect;
+    private Image sunsetRaysImg;
+    private RectTransform sunsetRaysRect;
 
     void Awake()
     {
@@ -46,19 +52,21 @@ public class MainMenu : MonoBehaviour
         FixMenuLayout();
         SpawnFloatingEmbers();
         SpawnDragonMouthSparks();
+        SpawnDesertSandWind();
     }
 
     void LoadFantasyAssets()
     {
-        btnNormal      = Resources.Load<Sprite>("UI/btn_fantasy_normal");
-        btnHover       = Resources.Load<Sprite>("UI/btn_fantasy_hover");
-        btnPressed     = Resources.Load<Sprite>("UI/btn_fantasy_pressed");
-        leftVignette   = Resources.Load<Sprite>("UI/menu_left_vignette");
-        screenVignette = Resources.Load<Sprite>("UI/screen_vignette");
-        fireGlowSprite = Resources.Load<Sprite>("UI/fire_glow");
+        btnNormal        = Resources.Load<Sprite>("UI/btn_fantasy_normal");
+        btnHover         = Resources.Load<Sprite>("UI/btn_fantasy_hover");
+        btnPressed       = Resources.Load<Sprite>("UI/btn_fantasy_pressed");
+        leftVignette     = Resources.Load<Sprite>("UI/menu_left_vignette");
+        screenVignette   = Resources.Load<Sprite>("UI/screen_vignette");
+        fireGlowSprite   = Resources.Load<Sprite>("UI/fire_glow");
+        sunsetRaysSprite = Resources.Load<Sprite>("UI/sunset_rays");
 
-        sfxHover       = Resources.Load<AudioClip>("Audio/ui_hover");
-        sfxClick       = Resources.Load<AudioClip>("Audio/ui_click");
+        sfxHover         = Resources.Load<AudioClip>("Audio/ui_hover");
+        sfxClick         = Resources.Load<AudioClip>("Audio/ui_click");
     }
 
     void BuildAtmosphere()
@@ -110,17 +118,19 @@ public class MainMenu : MonoBehaviour
         Canvas canvas = GetComponentInParent<Canvas>();
         if (canvas == null) return;
 
-        // Cari GameObject Background
         Transform bgT = canvas.transform.Find("Background");
         if (bgT != null)
         {
-            bgRect = bgT.GetComponent<RectTransform>();
+            bgImage = bgT.GetComponent<Image>();
+            bgRect  = bgT.GetComponent<RectTransform>();
+
             if (bgRect != null)
             {
                 bgBasePos = bgRect.anchoredPosition;
-                bgRect.localScale = new Vector3(1.06f, 1.06f, 1f);
+                // Skala 1.10x agar saat drifting & tilt lebih dinamis tidak tampak batas tepi
+                bgRect.localScale = new Vector3(1.10f, 1.10f, 1f);
 
-                // Cahaya api di mulut naga
+                // 1. Cahaya api membara di mulut naga
                 if (fireGlowSprite != null && bgT.Find("Dragon_Fire_Glow") == null)
                 {
                     GameObject glowGO = new GameObject("Dragon_Fire_Glow");
@@ -130,16 +140,16 @@ public class MainMenu : MonoBehaviour
                     fireGlowRect.anchorMin = new Vector2(0.594f, 0.463f);
                     fireGlowRect.anchorMax = new Vector2(0.594f, 0.463f);
                     fireGlowRect.pivot     = new Vector2(0.5f, 0.5f);
-                    fireGlowRect.sizeDelta = new Vector2(170f, 170f);
+                    fireGlowRect.sizeDelta = new Vector2(190f, 190f);
                     fireGlowRect.anchoredPosition = Vector2.zero;
 
                     fireGlowImg = glowGO.AddComponent<Image>();
                     fireGlowImg.sprite = fireGlowSprite;
-                    fireGlowImg.color  = new Color(1f, 0.65f, 0.2f, 0.55f);
+                    fireGlowImg.color  = new Color(1f, 0.65f, 0.18f, 0.60f);
                     fireGlowImg.raycastTarget = false;
                 }
 
-                // Denyut cahaya halo matahari
+                // 2. Denyut cahaya halo matahari di langit
                 if (fireGlowSprite != null && bgT.Find("Sun_Halo_Glow") == null)
                 {
                     GameObject haloGO = new GameObject("Sun_Halo_Glow");
@@ -149,13 +159,32 @@ public class MainMenu : MonoBehaviour
                     sunHaloRect.anchorMin = new Vector2(0.505f, 0.705f);
                     sunHaloRect.anchorMax = new Vector2(0.505f, 0.705f);
                     sunHaloRect.pivot     = new Vector2(0.5f, 0.5f);
-                    sunHaloRect.sizeDelta = new Vector2(320f, 320f);
+                    sunHaloRect.sizeDelta = new Vector2(360f, 360f);
                     sunHaloRect.anchoredPosition = Vector2.zero;
 
                     sunHaloImg = haloGO.AddComponent<Image>();
                     sunHaloImg.sprite = fireGlowSprite;
-                    sunHaloImg.color  = new Color(1f, 0.85f, 0.4f, 0.20f);
+                    sunHaloImg.color  = new Color(1f, 0.85f, 0.4f, 0.22f);
                     sunHaloImg.raycastTarget = false;
+                }
+
+                // 3. Berkas sinar matahari senja (Sunset Godrays)
+                if (sunsetRaysSprite != null && bgT.Find("Sunset_Godrays") == null)
+                {
+                    GameObject raysGO = new GameObject("Sunset_Godrays");
+                    raysGO.transform.SetParent(bgT, false);
+
+                    sunsetRaysRect = raysGO.AddComponent<RectTransform>();
+                    sunsetRaysRect.anchorMin = new Vector2(0.505f, 0.710f);
+                    sunsetRaysRect.anchorMax = new Vector2(0.505f, 0.710f);
+                    sunsetRaysRect.pivot     = new Vector2(0.5f, 1.0f);
+                    sunsetRaysRect.sizeDelta = new Vector2(750f, 650f);
+                    sunsetRaysRect.anchoredPosition = Vector2.zero;
+
+                    sunsetRaysImg = raysGO.AddComponent<Image>();
+                    sunsetRaysImg.sprite = sunsetRaysSprite;
+                    sunsetRaysImg.color  = new Color(1f, 0.82f, 0.45f, 0.28f);
+                    sunsetRaysImg.raycastTarget = false;
                 }
             }
         }
@@ -163,23 +192,29 @@ public class MainMenu : MonoBehaviour
 
     void Update()
     {
-        AnimateBackgroundMotion();
-        AnimateFireAndGlow();
+        AnimateDynamicMotion();
+        AnimateSkyAndFire();
     }
 
-    void AnimateBackgroundMotion()
+    void AnimateDynamicMotion()
     {
         if (bgRect == null) return;
 
         float t = Time.time;
 
-        // 1. Ken Burns Cinematic Drift
-        float driftX = Mathf.Sin(t * 0.22f) * 14f;
-        float driftY = Mathf.Cos(t * 0.18f) * 8f;
-        float zoom   = 1.06f + Mathf.Sin(t * 0.12f) * 0.015f;
+        // 1. Gerakan terbang dinamis naga (kombinasi ayunan sayap + turbulensi angin)
+        float swayX = Mathf.Sin(t * 0.40f) * 26f + Mathf.Sin(t * 1.05f) * 6f;
+        float bobY  = Mathf.Cos(t * 0.32f) * 16f + Mathf.Sin(t * 0.85f) * 4f;
+
+        // Zoom bernapas perlahan
+        float zoom = 1.10f + Mathf.Sin(t * 0.16f) * 0.025f;
         bgRect.localScale = new Vector3(zoom, zoom, 1f);
 
-        // 2. Interactive Mouse Parallax
+        // Sedikit kemiringan (tilt/roll angle) alami saat berbelok di udara
+        float rollAngle = Mathf.Sin(t * 0.32f) * 1.6f;
+        bgRect.localEulerAngles = new Vector3(0f, 0f, rollAngle);
+
+        // 2. Interactive Mouse Parallax lebih responsif & dinamis
         Vector2 mouseNorm = Vector2.zero;
         if (Screen.width > 0 && Screen.height > 0)
         {
@@ -188,32 +223,57 @@ public class MainMenu : MonoBehaviour
                 (Input.mousePosition.y / Screen.height) - 0.5f
             );
         }
-        Vector2 targetParallax = new Vector2(-mouseNorm.x * 22f, -mouseNorm.y * 14f);
-        currentParallax = Vector2.Lerp(currentParallax, targetParallax, Time.deltaTime * 3.5f);
+        Vector2 targetParallax = new Vector2(-mouseNorm.x * 38f, -mouseNorm.y * 24f);
+        currentParallax = Vector2.Lerp(currentParallax, targetParallax, Time.deltaTime * 4.0f);
 
-        bgRect.anchoredPosition = bgBasePos + new Vector2(driftX, driftY) + currentParallax;
+        bgRect.anchoredPosition = bgBasePos + new Vector2(swayX, bobY) + currentParallax;
     }
 
-    void AnimateFireAndGlow()
+    void AnimateSkyAndFire()
     {
         float t = Time.time;
 
+        // 1. Api di mulut naga berkedip hidup & membara
         if (fireGlowImg != null && fireGlowRect != null)
         {
-            float flicker = Mathf.PerlinNoise(t * 5.5f, 0f);
-            float scaleMul = 0.92f + flicker * 0.25f;
+            float flicker = Mathf.PerlinNoise(t * 6.5f, 0f);
+            float scaleMul = 0.90f + flicker * 0.30f;
             fireGlowRect.localScale = new Vector3(scaleMul, scaleMul, 1f);
 
-            float alpha = 0.40f + flicker * 0.35f;
+            float alpha = 0.45f + flicker * 0.40f;
             fireGlowImg.color = new Color(1f, 0.65f, 0.18f, alpha);
         }
 
+        // 2. Halo matahari di langit berdenyut lembut
         if (sunHaloImg != null && sunHaloRect != null)
         {
-            float pulse = Mathf.Sin(t * 1.2f) * 0.5f + 0.5f;
-            float s = 0.95f + pulse * 0.10f;
+            float pulse = Mathf.Sin(t * 1.1f) * 0.5f + 0.5f;
+            float s = 0.95f + pulse * 0.12f;
             sunHaloRect.localScale = new Vector3(s, s, 1f);
-            sunHaloImg.color = new Color(1f, 0.85f, 0.45f, 0.15f + pulse * 0.15f);
+            sunHaloImg.color = new Color(1f, 0.85f, 0.45f, 0.18f + pulse * 0.16f);
+        }
+
+        // 3. Berkas sinar matahari sore (Sunset Godrays) berkedip & menyapu lembut
+        if (sunsetRaysImg != null && sunsetRaysRect != null)
+        {
+            float rayPulse = Mathf.Sin(t * 0.75f) * 0.5f + 0.5f;
+            sunsetRaysImg.color = new Color(1f, 0.85f, 0.45f, 0.18f + rayPulse * 0.18f);
+
+            // Ayunan sudut sinar tipis
+            float rayAngle = Mathf.Sin(t * 0.30f) * 2.5f;
+            sunsetRaysRect.localEulerAngles = new Vector3(0f, 0f, rayAngle);
+        }
+
+        // 4. Perubahan rona hangat langit sore (Sunset Twilight Breathe)
+        if (bgImage != null)
+        {
+            float sunsetBreathe = Mathf.Sin(t * 0.45f) * 0.5f + 0.5f;
+            // Rona keemasan hangat senja
+            bgImage.color = Color.Lerp(
+                new Color(1.0f, 0.96f, 0.92f, 1f),
+                new Color(1.0f, 0.88f, 0.82f, 1f),
+                sunsetBreathe
+            );
         }
     }
 
@@ -288,7 +348,6 @@ public class MainMenu : MonoBehaviour
                     btn.colors = cb;
                 }
 
-                // Audio click SFX
                 btn.onClick.RemoveListener(PlayClickSound);
                 btn.onClick.AddListener(PlayClickSound);
             }
@@ -317,8 +376,6 @@ public class MainMenu : MonoBehaviour
                 }
             }
         }
-
-        Debug.Log("<color=gold>[MainMenu] Semua tombol dan teks berhasil diluruskan presisi!</color>");
     }
 
     void PlayClickSound()
@@ -438,8 +495,47 @@ public class MainMenu : MonoBehaviour
 
         var renderer = sparkGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 6;
+    }
 
-        Debug.Log("<color=orange>[MainMenu] Dynamic Live Wallpaper & Dragon Breath aktif!</color>");
+    // ─────────────────────────────────────────────────────────────────────
+    // Efek Angin Badai Pasir Gurun & Debu Berterbangan (Desert Sand Wind)
+    // ─────────────────────────────────────────────────────────────────────
+    void SpawnDesertSandWind()
+    {
+        if (GameObject.Find("Desert_Sand_Wind") != null) return;
+
+        GameObject sandGO = new GameObject("Desert_Sand_Wind");
+        // Posisi di sisi kanan layar agar pasir tertiup ke kiri
+        sandGO.transform.position = new Vector3(10f, -1.0f, 0f);
+
+        ParticleSystem ps = sandGO.AddComponent<ParticleSystem>();
+
+        var main = ps.main;
+        main.loop            = true;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(2.8f, 4.5f);
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(4.5f, 8.5f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(0.02f, 0.07f);
+        main.startColor      = new ParticleSystem.MinMaxGradient(
+            new Color(0.92f, 0.74f, 0.42f, 0.70f), // Pasir keemasan gurun
+            new Color(0.78f, 0.50f, 0.22f, 0.45f)  // Debu tanah liat senja
+        );
+        main.maxParticles    = 70;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = 0.03f; // Pasir sedikit meluncur ke bawah terbawa gravitasi
+
+        var emission = ps.emission;
+        emission.rateOverTime = 16f;
+
+        // Emitter garis vertikal tinggi di kanan, menembak kencang ke kiri
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale     = new Vector3(1f, 8.5f, 1f);
+        shape.rotation  = new Vector3(0f, 0f, 172f); // Menghadap ke kiri menyapu ngarai
+
+        var renderer = sandGO.GetComponent<ParticleSystemRenderer>();
+        renderer.sortingOrder = 7;
+
+        Debug.Log("<color=yellow>[MainMenu] Efek Angin Pasir Gurun & Langit Senja aktif!</color>");
     }
 
     // ─────────────────────────────────────────────────────────────────────
