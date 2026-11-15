@@ -8,7 +8,7 @@ public class CameraFollow : MonoBehaviour
     public Transform target;
     public Transform overrideTarget;      // Target override saat cutscene (Boss)
     public float smoothSpeed = 5f;
-    public float cutsceneZoomSize = 7.0f; // Fokus sinematik anggun (tidak zoom terlalu dekat, default camera 8.0)
+    public float cutsceneZoomSize = 8.0f; // Framing sinematik seimbang (tidak terlalu zoom, default camera 8.0)
 
     private float fixedY;
     private float defaultOrthographicSize = 8f;

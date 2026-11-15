@@ -9,7 +9,7 @@ public class BossAI : Entity
     public float stopDistance = 1.5f;
 
     [Header("Visual & Size")]
-    public float bossScale = 2.2f;
+    public float bossScale = 1.8f;
     [Header("Attack")]
     public float attackRange = 3f;
     public float attackCooldown = 2f;
@@ -57,17 +57,17 @@ public class BossAI : Entity
 
         if (sr != null) originalColor = sr.color;
 
-        // Pertahankan skala boss dari scene (proporsional 2.2)
+        // Pertahankan skala boss dari scene (proporsional 1.8)
         if (Mathf.Abs(transform.localScale.y) > 0.1f)
         {
             bossScale = Mathf.Abs(transform.localScale.y);
         }
         else
         {
-            bossScale = 2.2f;
+            bossScale = 1.8f;
         }
 
-        bossScale = Mathf.Clamp(bossScale, 1.8f, 2.5f);
+        bossScale = Mathf.Clamp(bossScale, 1.5f, 2.0f);
 
         if (roarSound == null)
         {
@@ -126,7 +126,7 @@ public class BossAI : Entity
         // Flip logic menggunakan bossScale (hanya saat tidak sedang menyerang)
         if (!isAttacking)
         {
-            float s = Mathf.Clamp(bossScale, 1.8f, 2.5f);
+            float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
             if (dir > 0.1f)
                 transform.localScale = new Vector3(-s, s, 1f);
             else if (dir < -0.1f)
@@ -344,7 +344,7 @@ public class BossAI : Entity
 
     public void PlayRoar()
     {
-        bossScale = Mathf.Clamp(bossScale, 1.8f, 2.5f);
+        bossScale = Mathf.Clamp(bossScale, 1.5f, 2.0f);
 
         if (anim != null)
         {
@@ -361,7 +361,7 @@ public class BossAI : Entity
         if (player != null)
         {
             float dir = player.position.x - transform.position.x;
-            float s = Mathf.Clamp(bossScale, 1.8f, 2.5f);
+            float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
             if (dir > 0.1f)
                 transform.localScale = new Vector3(-s, s, 1f);
             else if (dir < -0.1f)
