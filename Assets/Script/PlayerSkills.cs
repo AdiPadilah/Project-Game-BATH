@@ -41,6 +41,7 @@ public class PlayerSkills : MonoBehaviour
     private AudioClip sfxThrust;
     private AudioClip sfxCyclone;
     private AudioClip sfxUltimate;
+    private AudioClip sfxUltimatePop;
 
     // Combat FX Sprites
     private Sprite fxSlashArc;
@@ -80,9 +81,10 @@ public class PlayerSkills : MonoBehaviour
 
     private void LoadAssets()
     {
-        sfxThrust   = Resources.Load<AudioClip>("Audio/skill_thrust");
-        sfxCyclone  = Resources.Load<AudioClip>("Audio/skill_cyclone");
-        sfxUltimate = Resources.Load<AudioClip>("Audio/skill_ultimate");
+        sfxThrust      = Resources.Load<AudioClip>("Audio/skill_thrust");
+        sfxCyclone     = Resources.Load<AudioClip>("Audio/skill_cyclone");
+        sfxUltimate    = Resources.Load<AudioClip>("Audio/skill_ultimate");
+        sfxUltimatePop = Resources.Load<AudioClip>("Audio/skill_ultimate_pop");
 
         fxSlashArc      = Resources.Load<Sprite>("FX/fx_slash_arc_gold");
         fxSlashCross    = Resources.Load<Sprite>("FX/fx_slash_cross");
@@ -285,71 +287,108 @@ public class PlayerSkills : MonoBehaviour
         player.canMove = false;
         player.SetInvincible(true);
 
-        // ── PHASE 1: Dramatic Anime Time Freeze (0.18s) ───────────────────────
+        float dir = player.facingRight ? 1f : -1f;
+
+        // ── FASE 1: Dramatic Anime Time Freeze (0.16s) ───────────────────────
         Time.timeScale = 0.08f;
 
         // Suara charge pembuka ultimate
         if (sfxUltimate != null && audioSource != null)
-            audioSource.PlayOneShot(sfxUltimate, 1.35f);
+            audioSource.PlayOneShot(sfxUltimate, 1.25f);
 
         // Efek aura cahaya emas di sekitar ksatria
         SpawnVisualFX(transform.position, fxWhirlwind, Vector3.one * 1.8f, 0f, 0.25f, new Color(1f, 0.85f, 0.2f, 0.95f), true, 2.5f);
 
-        yield return new WaitForSecondsRealtime(0.18f);
+        yield return new WaitForSecondsRealtime(0.16f);
 
-        // ── PHASE 2: Dimensional Blade Blitz (Tebasan Menembus Ruang) ────────
+        // ── FASE 2: Dimensional Blade Blitz (Tebasan Menembus Ruang) ────────
         Time.timeScale = 1.0f;
 
-        // Gempa layar dahsyat (Screen Shake intens)
         if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.85f, 0.45f);
+            CameraFollow.instance.TriggerScreenShake(0.35f, 0.30f);
 
         if (anim != null)
             anim.SetTrigger("attackCombo");
 
-        float dir = player.facingRight ? 1f : -1f;
-        rb.velocity = new Vector2(dir * 18f, 0f);
+        rb.velocity = new Vector2(dir * 20f, 0f);
 
-        // 6 Titik Tebasan Dimensi Silang di seluruh area musuh
+        // 6 Titik Tebasan Dimensi Silang di udara yang BERTATIKAN (Lingering Slashes)
         int hitCount = 6;
-        int perHitDmg = skill3DamageTotal / hitCount; // 300 / 6 = 50 damage per hit!
+        int sliceDmg = 25; // 6 x 25 = 150 damage tebasan awal
 
-        float[] angles = new float[] { 0f, 45f, -30f, 75f, -60f, 15f };
+        float[] angles = new float[] { 15f, -35f, 60f, -60f, 40f, -10f };
+        List<Vector3> lingeringSlashPositions = new List<Vector3>();
 
         for (int i = 0; i < hitCount; i++)
         {
-            // Munculkan bayangan melesat
-            SpawnAfterimage(new Color(1f, 0.2f, 0.2f, 0.75f)); // Afterimage merah darah/emas
+            // Bayangan ksatria merah-emas tertinggal di lintasan
+            SpawnAfterimage(new Color(1f, 0.25f, 0.2f, 0.75f));
 
-            // Hitung posisi tebasan di depan player
-            Vector3 slashPos = transform.position + new Vector3(Random.Range(-1.5f, 3.5f) * dir, Random.Range(-0.8f, 1.8f), 0f);
+            Vector3 slashPos = transform.position + new Vector3(Random.Range(-1.0f, 2.8f) * dir, Random.Range(-0.5f, 1.5f), 0f);
+            lingeringSlashPositions.Add(slashPos);
 
-            // Tebasan Silang Raksasa & Busur Emas
-            SpawnVisualFX(slashPos, fxSlashCross, Vector3.one * Random.Range(1.6f, 2.4f), angles[i], 0.28f, Color.white);
-            SpawnVisualFX(slashPos, fxSlashArc, Vector3.one * Random.Range(1.8f, 2.6f), -angles[i], 0.25f, new Color(1f, 0.9f, 0.4f, 0.95f));
+            // Munculkan tebasan dimensi yang bertahan di udara (durasi lebih panjang menanti detonasi)
+            SpawnVisualFX(slashPos, fxSlashCross, Vector3.one * Random.Range(1.8f, 2.4f), angles[i], 0.90f, new Color(1f, 0.95f, 0.8f, 0.95f));
+            SpawnVisualFX(slashPos, fxSlashArc, Vector3.one * Random.Range(1.9f, 2.6f), -angles[i], 0.85f, new Color(1f, 0.85f, 0.3f, 0.9f));
 
-            // Berikan damage ke seluruh musuh di zona tebasan
+            // Damage tebasan awal
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, 6.0f, player.GetEnemyLayer());
             foreach (var hit in hits)
             {
                 Entity enemy = hit.GetComponent<Entity>();
                 if (enemy != null && enemy != player)
                 {
-                    enemy.TakeDamage(perHitDmg, (i == hitCount - 1)); // Hit terakhir knockback terpental
+                    enemy.TakeDamage(sliceDmg, false);
                 }
             }
 
-            yield return new WaitForSeconds(0.07f);
+            yield return new WaitForSeconds(0.06f);
         }
 
+        // Hentikan laju ksatria di ujung lintasan
         rb.velocity = Vector2.zero;
 
-        // ── PHASE 3: Detonasi Tebasan Pamungkas ("CLANG / CHING!") ────────────
-        Vector3 centerPos = transform.position + new Vector3(dir * 1.5f, 0.5f, 0f);
-        SpawnVisualFX(centerPos, fxSlashCross, Vector3.one * 3.2f, 0f, 0.45f, new Color(1f, 1f, 0.9f, 1f), true, 4.5f);
-        SpawnVisualFX(centerPos, fxWhirlwind, Vector3.one * 2.0f, 0f, 0.45f, new Color(1f, 0.85f, 0.3f, 0.9f), true, 5.0f);
+        // ── FASE 3: DRAMATIC DELAY / SUSPENSE (Kuda-Kuda Menyarungkan Pedang) ─
+        // Player diam tak bergerak di seberang, retakan dimensi berdenyut di udara...
+        float delayPopOut = 0.52f; // Jeda menegangkan sebelum meledak!
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(delayPopOut, 0.12f); // Getaran halus antisipasi
 
-        yield return new WaitForSeconds(0.20f);
+        yield return new WaitForSeconds(delayPopOut);
+
+        // ── FASE 4: POP-OUT FINISHER DETONATION ("CLINK!" & BOOM!) ───────────
+        // Suara sheathe clink tajam + dentuman ledakan dahsyat
+        if (sfxUltimatePop != null && audioSource != null)
+            audioSource.PlayOneShot(sfxUltimatePop, 1.4f);
+
+        // Gempa layar dahsyat saat seluruh tebasan meledak serentak
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(0.70f, 0.55f);
+
+        // Pop-out serentak di semua bekas tebasan yang tertinggal
+        foreach (var pos in lingeringSlashPositions)
+        {
+            SpawnVisualFX(pos, fxSlashCross, Vector3.one * 2.4f, Random.Range(-45f, 45f), 0.35f, Color.white, true, 2.6f);
+        }
+
+        // Detonasi ledakan raksasa di tengah arena
+        Vector3 blastCenter = transform.position - new Vector3(dir * 2.0f, -0.4f, 0f);
+        SpawnVisualFX(blastCenter, fxSlashCross, Vector3.one * 4.5f, 0f, 0.55f, Color.white, true, 3.5f);
+        SpawnVisualFX(blastCenter, fxWhirlwind, Vector3.one * 3.2f, 0f, 0.55f, new Color(1f, 0.85f, 0.25f, 1f), true, 4.0f);
+
+        // FINISHER BURST DAMAGE: 150 Damage tambahan (Total 300 damage!) + Knockback terpental dahsyat!
+        int finisherBurstDmg = 150;
+        Collider2D[] finalHits = Physics2D.OverlapCircleAll(blastCenter, 7.5f, player.GetEnemyLayer());
+        foreach (var hit in finalHits)
+        {
+            Entity enemy = hit.GetComponent<Entity>();
+            if (enemy != null && enemy != player)
+            {
+                enemy.TakeDamage(finisherBurstDmg, true); // applyKnockback = true!
+            }
+        }
+
+        yield return new WaitForSeconds(0.35f);
 
         player.SetInvincible(false);
         player.canMove = true;
