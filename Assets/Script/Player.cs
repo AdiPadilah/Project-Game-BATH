@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -31,6 +32,7 @@ public class Player : Entity
     private bool isAttacking = false;
     private bool comboQueued = false;
     private bool hasHitEnemyInCombo = false; // HARUS kena musuh agar bisa masuk combo finisher!
+    private HashSet<Entity> hitEntitiesInCurrentAttack = new HashSet<Entity>();
     private Light dynamicSwordLight;
 
     [SerializeField] private float attackRange = 2f;
@@ -262,6 +264,7 @@ public class Player : Entity
     {
         isAttacking = true;
         comboQueued = false;
+        hitEntitiesInCurrentAttack.Clear();
         lastAttackTime = Time.time;
 
         // Berhenti bergerak saat mulai menebas (tidak bisa menyerang sambil lari)
@@ -371,17 +374,22 @@ public class Player : Entity
             Entity enemy = target.GetComponent<Entity>();
             if (enemy != null && enemy != this)
             {
+                // Cegah multi-hit ganda pada musuh yang sama dalam satu ayunan serangan
+                if (hitEntitiesInCurrentAttack.Contains(enemy))
+                    continue;
+                hitEntitiesInCurrentAttack.Add(enemy);
+
                 // Musuh kena! Kunci terbuka untuk combo finisher!
                 hasHitEnemyInCombo = true;
 
-                // Damage seimbang: tidak langsung membuat musuh mati seketika
-                int damage = 3;
-                if (currentComboStep == 1) damage = 3;
-                else if (currentComboStep == 2) damage = 4;
-                else if (currentComboStep == 3) damage = 5;
+                // Player: 20 damage per hit (step 1-3), combo finisher 30 damage (step 4)
+                int damage = 20;
+                if (currentComboStep == 1) damage = 20;
+                else if (currentComboStep == 2) damage = 20;
+                else if (currentComboStep == 3) damage = 20;
                 else if (currentComboStep == 4)
                 {
-                    damage = 4; // Multi-hit tebasan mutilasi (total ~16 damage)
+                    damage = 30;
                     // Suara combo finisher saat kena — pakai hitSounds dengan pitch rendah (berat)
                     if (audioSource != null && hitSounds != null && hitSounds.Length > 0)
                     {

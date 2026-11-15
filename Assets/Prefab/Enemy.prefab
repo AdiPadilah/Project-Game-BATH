@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 3447182604499881540}
   - component: {fileID: 157610429913106958}
   - component: {fileID: 5675466815490167885}
-  - component: {fileID: 5671308238371962104}
   - component: {fileID: -1895669505541959210}
   m_Layer: 7
   m_Name: Enemy
@@ -52,11 +51,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4bbb2c3a8b238440ace6f213e993bd8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 20
-  currentHealth: 0
+  maxHealth: 50
+  currentHealth: 50
   damagedMaterial: {fileID: 2100000, guid: 66a7d145d86e6944586ea84e18027df8, type: 2}
   damageFeedbackDuration: 0.3
-  invincibleTime: 0.4
+  invincibleTime: 0.1
   knockbackForce: 5
   knockbackUpForce: 3
   attackDamage: 10
@@ -137,20 +136,6 @@ CapsuleCollider2D:
   m_Offset: {x: -0.06527424, y: 0.021119535}
   m_Size: {x: 1.0596371, y: 1.828899}
   m_Direction: 0
---- !u!114 &5671308238371962104
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1923791995122859728}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66994555b10448a40ba679d03d2f3f73, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxHealth: 24
-  healthSlider: {fileID: 164463800537756723}
 --- !u!82 &-1895669505541959210
 AudioSource:
   m_ObjectHideFlags: 0
@@ -556,9 +541,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 0}
   m_Direction: 0
   m_MinValue: 0
-  m_MaxValue: 1
+  m_MaxValue: 50
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 50
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []

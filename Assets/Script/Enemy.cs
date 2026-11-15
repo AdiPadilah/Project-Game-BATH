@@ -26,6 +26,13 @@ public class Enemy : Entity
     {
         base.Awake();
 
+        // Singkirkan script Health sisa jika ada agar tidak bentrok dengan Enemy
+        Health leftoverHealth = GetComponent<Health>();
+        if (leftoverHealth != null)
+            Destroy(leftoverHealth);
+
+        invincibleTime = 0.1f;
+
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
@@ -55,6 +62,16 @@ public class Enemy : Entity
         Player foundPlayer = FindFirstObjectByType<Player>();
         if (foundPlayer != null)
             player = foundPlayer.transform;
+    }
+
+    protected virtual void Start()
+    {
+        // Pastikan Slider selalu sinkron dengan maxHealth (50) dan darah penuh saat baru spawn
+        if (healthSlider != null)
+        {
+            healthSlider.maxValue = maxHealth;
+            healthSlider.value = currentHealth;
+        }
     }
 
     protected override void Update()
@@ -87,6 +104,7 @@ public class Enemy : Entity
     {
         if (healthSlider != null)
         {
+            healthSlider.maxValue = maxHealth;
             healthSlider.value = Mathf.Max(0, currentHealth);
             if (currentHealth <= 0)
             {
