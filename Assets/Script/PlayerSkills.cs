@@ -293,10 +293,8 @@ public class PlayerSkills : MonoBehaviour
         // ══════════════════════════════════════════════════════════════════════
         yield return StartCoroutine(DarkenScreen(0.30f, 0.75f));   // fade ke gelap 0.3s
 
-        // ══════════════════════════════════════════════════════════════════════
-        // CUT-IN ANIMATION (banner slide masuk dari kanan, layar masih gelap)
-        // ══════════════════════════════════════════════════════════════════════
-        yield return StartCoroutine(ShowUltimateCutIn());
+        // Tahan gelap sebentar (dramatic pause)
+        yield return new WaitForSecondsRealtime(0.40f);
 
         // Layar terang kembali saat ultimate mulai
         yield return StartCoroutine(BrightenScreen(0.18f));
