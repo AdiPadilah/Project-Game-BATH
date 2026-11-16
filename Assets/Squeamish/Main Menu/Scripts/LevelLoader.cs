@@ -22,6 +22,12 @@ public class LevelLoader : MonoBehaviour
         StartCoroutine(LoadScene());
     }
 
+    public void LoadLevelByIndex(int index)
+    {
+        sceneIndex = index;
+        LoadLevel();
+    }
+
     IEnumerator LoadScene()
     {
         // Mulai load scene (ditahan dulu)

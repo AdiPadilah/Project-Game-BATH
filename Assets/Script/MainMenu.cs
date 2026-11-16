@@ -35,6 +35,12 @@ public class MainMenu : MonoBehaviour
     private Image sunsetRaysImg;
     private RectTransform sunsetRaysRect;
 
+    // ── Modal Tutorial & Stage Select ─────────────────────────────────────
+    private GameObject tutorialPromptGO;
+    private GameObject stageSelectGO;
+    private TMP_FontAsset tmpFontAsset;
+    private LevelLoader levelLoader;
+
     void Awake()
     {
         audioSource = GetComponent<AudioSource>();
@@ -56,6 +62,11 @@ public class MainMenu : MonoBehaviour
         SpawnFloatingEmbers();
         SpawnDragonMouthSparks();
         SpawnDesertSandWind();
+
+        // ── Modal UI ──────────────────────────────────────────────────────
+        BuildTutorialPromptModal();
+        BuildStageSelectModal();
+        ShowTutorialPrompt();
     }
 
     void LoadFantasyAssets()
@@ -71,6 +82,18 @@ public class MainMenu : MonoBehaviour
 
         sfxHover         = Resources.Load<AudioClip>("Audio/ui_hover");
         sfxClick         = Resources.Load<AudioClip>("Audio/ui_click");
+
+        // TMP Font
+        tmpFontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+
+        // LevelLoader
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = FindObjectOfType<Canvas>();
+        if (canvas != null)
+        {
+            Transform loadingT = canvas.transform.Find("Loading");
+            if (loadingT != null) levelLoader = loadingT.GetComponent<LevelLoader>();
+        }
     }
 
     void BuildAtmosphere()
@@ -345,6 +368,14 @@ public class MainMenu : MonoBehaviour
 
                 btn.onClick.RemoveListener(PlayClickSound);
                 btn.onClick.AddListener(PlayClickSound);
+
+                // Reroute Play Button → buka Menu Stage
+                if (btnName == "Play Button")
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(PlayClickSound);
+                    btn.onClick.AddListener(OpenStageSelect);
+                }
             }
 
             AddHoverEffect(btnT.gameObject);
@@ -666,6 +697,356 @@ public class MainMenu : MonoBehaviour
 
         var renderer = sandGO.GetComponent<ParticleSystemRenderer>();
         renderer.sortingOrder = 7;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // PANEL AJAKAN TUTORIAL
+    // ═════════════════════════════════════════════════════════════════════
+
+    Canvas GetMainCanvas()
+    {
+        Canvas c = GetComponentInParent<Canvas>();
+        if (c == null) c = FindObjectOfType<Canvas>();
+        return c;
+    }
+
+    // Helper buat button fantasi
+    Button MakeFancyButton(Transform parent, string goName, string labelText,
+                           float width, float height, float anchoredX, float anchoredY)
+    {
+        GameObject go = new GameObject(goName);
+        go.transform.SetParent(parent, false);
+
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(width, height);
+        rt.anchoredPosition = new Vector2(anchoredX, anchoredY);
+
+        Image img = go.AddComponent<Image>();
+        if (btnNormal != null) { img.sprite = btnNormal; img.type = Image.Type.Sliced; img.color = Color.white; }
+        else img.color = new Color(0.08f, 0.05f, 0.14f, 0.92f);
+
+        Button btn = go.AddComponent<Button>();
+        if (btnHover != null && btnPressed != null)
+        {
+            btn.transition = Selectable.Transition.SpriteSwap;
+            SpriteState ss = new SpriteState();
+            ss.highlightedSprite = btnHover;
+            ss.pressedSprite     = btnPressed;
+            ss.selectedSprite    = btnHover;
+            btn.spriteState = ss;
+        }
+        btn.onClick.AddListener(PlayClickSound);
+        AddHoverEffect(go);
+
+        // Label
+        GameObject textGO = new GameObject("Label");
+        textGO.transform.SetParent(go.transform, false);
+        RectTransform trt = textGO.AddComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one;
+        trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
+
+        TMP_Text tmp = textGO.AddComponent<TextMeshProUGUI>();
+        tmp.text = labelText;
+        tmp.font = tmpFontAsset;
+        tmp.fontSize = 24f;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = new Color(1f, 0.95f, 0.80f, 1f);
+        tmp.enableWordWrapping = false;
+        tmp.overflowMode = TextOverflowModes.Overflow;
+
+        return btn;
+    }
+
+    // Helper buat teks TMP
+    TMP_Text MakeText(Transform parent, string goName, string text,
+                      float fontSize, Color color, float anchoredY, float height = 60f)
+    {
+        GameObject go = new GameObject(goName);
+        go.transform.SetParent(parent, false);
+
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 0.5f);
+        rt.anchorMax = new Vector2(1f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(0f, height);
+        rt.anchoredPosition = new Vector2(0f, anchoredY);
+
+        TMP_Text tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.text = text;
+        tmp.font = tmpFontAsset;
+        tmp.fontSize = fontSize;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = color;
+        tmp.enableWordWrapping = true;
+        tmp.overflowMode = TextOverflowModes.Overflow;
+
+        return tmp;
+    }
+
+    // ── Overlay Dimmer ─────────────────────────────────────────────────
+    GameObject MakeDimmer(Transform parent, string name, int siblingIndex = -1)
+    {
+        GameObject dimmer = new GameObject(name + "_Dimmer");
+        dimmer.transform.SetParent(parent, false);
+        if (siblingIndex >= 0) dimmer.transform.SetSiblingIndex(siblingIndex);
+
+        RectTransform rt = dimmer.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
+        Image img = dimmer.AddComponent<Image>();
+        img.color = new Color(0f, 0f, 0f, 0.72f);
+        return dimmer;
+    }
+
+    void BuildTutorialPromptModal()
+    {
+        Canvas canvas = GetMainCanvas();
+        if (canvas == null) return;
+        if (canvas.transform.Find("TutorialPrompt") != null) return; // sudah ada
+
+        // Root container (fullscreen)
+        tutorialPromptGO = new GameObject("TutorialPrompt");
+        tutorialPromptGO.transform.SetParent(canvas.transform, false);
+        tutorialPromptGO.transform.SetAsLastSibling();
+
+        RectTransform rootRt = tutorialPromptGO.AddComponent<RectTransform>();
+        rootRt.anchorMin = Vector2.zero; rootRt.anchorMax = Vector2.one;
+        rootRt.offsetMin = Vector2.zero; rootRt.offsetMax = Vector2.zero;
+
+        // Dimmer
+        MakeDimmer(tutorialPromptGO.transform, "Tutorial");
+
+        // Modal panel
+        GameObject modal = new GameObject("Modal");
+        modal.transform.SetParent(tutorialPromptGO.transform, false);
+
+        RectTransform mrt = modal.AddComponent<RectTransform>();
+        mrt.anchorMin = new Vector2(0.5f, 0.5f);
+        mrt.anchorMax = new Vector2(0.5f, 0.5f);
+        mrt.pivot     = new Vector2(0.5f, 0.5f);
+        mrt.sizeDelta = new Vector2(620f, 380f);
+        mrt.anchoredPosition = Vector2.zero;
+
+        Image modalImg = modal.AddComponent<Image>();
+        if (modalPanelSprite != null)
+        { modalImg.sprite = modalPanelSprite; modalImg.type = Image.Type.Sliced; modalImg.color = Color.white; }
+        else modalImg.color = new Color(0.07f, 0.04f, 0.14f, 0.97f);
+
+        // Judul
+        MakeText(modal.transform, "Title",
+            "✦ TUTORIAL PERTARUNGAN ✦",
+            32f, new Color(1f, 0.88f, 0.42f, 1f), 130f, 60f);
+
+        // Deskripsi
+        MakeText(modal.transform, "Desc",
+            "Hai, Pejuang!\nApakah kamu ingin memainkan\nTutorial terlebih dahulu?",
+            22f, new Color(0.9f, 0.85f, 0.78f, 1f), 30f, 110f);
+
+        // Tombol IKUTI TUTORIAL (Ya)
+        Button btnYa = MakeFancyButton(modal.transform, "BtnYa",
+            "⚔  IKUTI TUTORIAL", 230f, 56f, -125f, -120f);
+        btnYa.onClick.AddListener(OnTutorialYesClicked);
+
+        // Tombol LEWATI (Skip)
+        Button btnSkip = MakeFancyButton(modal.transform, "BtnSkip",
+            "LEWATI  ➤", 200f, 56f, 115f, -120f);
+        btnSkip.onClick.AddListener(OnTutorialSkipClicked);
+
+        tutorialPromptGO.SetActive(false);
+    }
+
+    void ShowTutorialPrompt()
+    {
+        if (tutorialPromptGO != null) tutorialPromptGO.SetActive(true);
+    }
+
+    void HideTutorialPrompt()
+    {
+        if (tutorialPromptGO != null) tutorialPromptGO.SetActive(false);
+    }
+
+    void OnTutorialYesClicked()
+    {
+        HideTutorialPrompt();
+        StartGamePlayTutorial();
+    }
+
+    void OnTutorialSkipClicked()
+    {
+        HideTutorialPrompt();
+        OpenStageSelect();
+    }
+
+    void StartGamePlayTutorial()
+    {
+        if (levelLoader != null) levelLoader.LoadLevelByIndex(1);
+        else SceneManager.LoadScene("GamePlay");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // MENU STAGE
+    // ═════════════════════════════════════════════════════════════════════
+
+    void BuildStageSelectModal()
+    {
+        Canvas canvas = GetMainCanvas();
+        if (canvas == null) return;
+        if (canvas.transform.Find("StageSelect") != null) return;
+
+        // Root container
+        stageSelectGO = new GameObject("StageSelect");
+        stageSelectGO.transform.SetParent(canvas.transform, false);
+        stageSelectGO.transform.SetAsLastSibling();
+
+        RectTransform rootRt = stageSelectGO.AddComponent<RectTransform>();
+        rootRt.anchorMin = Vector2.zero; rootRt.anchorMax = Vector2.one;
+        rootRt.offsetMin = Vector2.zero; rootRt.offsetMax = Vector2.zero;
+
+        // Dimmer
+        MakeDimmer(stageSelectGO.transform, "Stage");
+
+        // Modal panel utama
+        GameObject panel = new GameObject("Panel");
+        panel.transform.SetParent(stageSelectGO.transform, false);
+
+        RectTransform prt = panel.AddComponent<RectTransform>();
+        prt.anchorMin = new Vector2(0.5f, 0.5f);
+        prt.anchorMax = new Vector2(0.5f, 0.5f);
+        prt.pivot     = new Vector2(0.5f, 0.5f);
+        prt.sizeDelta = new Vector2(860f, 560f);
+        prt.anchoredPosition = Vector2.zero;
+
+        Image panelImg = panel.AddComponent<Image>();
+        if (modalPanelSprite != null)
+        { panelImg.sprite = modalPanelSprite; panelImg.type = Image.Type.Sliced; panelImg.color = Color.white; }
+        else panelImg.color = new Color(0.07f, 0.04f, 0.14f, 0.97f);
+
+        // Judul
+        MakeText(panel.transform, "Title",
+            "✦  PILIH STAGE  ✦",
+            34f, new Color(1f, 0.88f, 0.42f, 1f), 220f, 60f);
+
+        // ── 4 Kartu Stage ──────────────────────────────────────────────
+        // Stage 0: Tutorial
+        BuildStageCard(panel.transform,
+            "Stage 0 - Tutorial",
+            "THE AWAKENING\nHutan Terlarang & Demon Slime",
+            "▶ MAINKAN",
+            new Color(0.25f, 0.72f, 0.38f, 1f),  // hijau tersedia
+            -290f,
+            () => { PlayClickSound(); StartGamePlayTutorial(); CloseStageSelect(); },
+            locked: false);
+
+        // Stage 1: Ancient Ruins
+        BuildStageCard(panel.transform,
+            "Stage 1 - Lembah Reruntuhan",
+            "LEMBAH RERUNTUHAN KUNO\nAncient Ruins",
+            "▶ MAINKAN",
+            new Color(0.25f, 0.55f, 0.90f, 1f),  // biru terbuka
+            -90f,
+            () => { PlayClickSound(); CloseStageSelect(); if (levelLoader != null) levelLoader.LoadLevelByIndex(2); else SceneManager.LoadScene("Next"); },
+            locked: false);
+
+        // Stage 2: Kawah Magma
+        BuildStageCard(panel.transform,
+            "Stage 2 - Kawah Magma",
+            "KAWAH MAGMA MEMBARA\nSegera Hadir...",
+            "🔒 TERKUNCI",
+            new Color(0.5f, 0.5f, 0.5f, 1f),
+            90f,
+            null,
+            locked: true);
+
+        // Stage 3: Takhta Keabadian
+        BuildStageCard(panel.transform,
+            "Stage 3 - Takhta Keabadian",
+            "TAKHTA KEABADIAN\nSegera Hadir...",
+            "🔒 TERKUNCI",
+            new Color(0.5f, 0.5f, 0.5f, 1f),
+            290f,
+            null,
+            locked: true);
+
+        // Tombol Kembali
+        Button btnBack = MakeFancyButton(panel.transform, "BtnKembali",
+            "← KEMBALI KE MENU", 240f, 50f, 0f, -220f);
+        btnBack.onClick.AddListener(CloseStageSelect);
+
+        stageSelectGO.SetActive(false);
+    }
+
+    void BuildStageCard(Transform parent, string goName, string desc, string btnLabel,
+                        Color accentColor, float anchoredX, System.Action onClick, bool locked)
+    {
+        // Container kartu
+        GameObject card = new GameObject(goName);
+        card.transform.SetParent(parent, false);
+
+        RectTransform crt = card.AddComponent<RectTransform>();
+        crt.anchorMin = new Vector2(0.5f, 0.5f);
+        crt.anchorMax = new Vector2(0.5f, 0.5f);
+        crt.pivot     = new Vector2(0.5f, 0.5f);
+        crt.sizeDelta = new Vector2(170f, 300f);
+        crt.anchoredPosition = new Vector2(anchoredX, 10f);
+
+        Image cardImg = card.AddComponent<Image>();
+        cardImg.color = locked
+            ? new Color(0.12f, 0.10f, 0.18f, 0.80f)
+            : new Color(0.10f, 0.07f, 0.20f, 0.95f);
+
+        // Accent strip atas
+        GameObject strip = new GameObject("Strip");
+        strip.transform.SetParent(card.transform, false);
+        RectTransform srt = strip.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0f, 1f); srt.anchorMax = new Vector2(1f, 1f);
+        srt.pivot     = new Vector2(0.5f, 1f);
+        srt.sizeDelta = new Vector2(0f, 6f);
+        srt.anchoredPosition = Vector2.zero;
+        Image simg = strip.AddComponent<Image>();
+        simg.color = accentColor;
+
+        // Nomor / ikon
+        MakeText(card.transform, "Num",
+            locked ? "🔒" : "⚔",
+            28f, accentColor, 100f, 50f);
+
+        // Deskripsi
+        MakeText(card.transform, "Desc",
+            desc, 13f, locked
+                ? new Color(0.6f, 0.6f, 0.6f, 0.8f)
+                : new Color(0.88f, 0.82f, 0.75f, 1f),
+            10f, 120f);
+
+        // Tombol aksi
+        if (!locked && onClick != null)
+        {
+            Button btn = MakeFancyButton(card.transform, "BtnPlay",
+                btnLabel, 150f, 42f, 0f, -105f);
+            btn.onClick.AddListener(() => onClick());
+        }
+        else
+        {
+            // Label terkunci (non-interactable)
+            MakeText(card.transform, "LockedLabel",
+                "SEGERA\nHADIR", 14f,
+                new Color(0.55f, 0.55f, 0.55f, 0.9f), -105f, 56f);
+        }
+    }
+
+    void OpenStageSelect()
+    {
+        HideTutorialPrompt();
+        if (stageSelectGO != null) stageSelectGO.SetActive(true);
+    }
+
+    void CloseStageSelect()
+    {
+        if (stageSelectGO != null) stageSelectGO.SetActive(false);
     }
 
     // ─────────────────────────────────────────────────────────────────────
