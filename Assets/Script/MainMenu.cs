@@ -62,11 +62,6 @@ public class MainMenu : MonoBehaviour
         SpawnFloatingEmbers();
         SpawnDragonMouthSparks();
         SpawnDesertSandWind();
-
-        // ── Modal UI ──────────────────────────────────────────────────────
-        BuildTutorialPromptModal();
-        BuildStageSelectModal();
-        ShowTutorialPrompt();
     }
 
     void LoadFantasyAssets()
@@ -369,12 +364,12 @@ public class MainMenu : MonoBehaviour
                 btn.onClick.RemoveListener(PlayClickSound);
                 btn.onClick.AddListener(PlayClickSound);
 
-                // Reroute Play Button → buka Menu Stage
+                // Reroute Play Button → masuk scene StageSelect
                 if (btnName == "Play Button")
                 {
                     btn.onClick.RemoveAllListeners();
                     btn.onClick.AddListener(PlayClickSound);
-                    btn.onClick.AddListener(OpenStageSelect);
+                    btn.onClick.AddListener(GoToStageSelect);
                 }
             }
 
@@ -699,8 +694,14 @@ public class MainMenu : MonoBehaviour
         renderer.sortingOrder = 7;
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    // PANEL AJAKAN TUTORIAL
+    // ─────────────────────────────────────────────────────────────────────
+    // NAVIGASI SCENE
+    // ─────────────────────────────────────────────────────────────────────
+    public void GoToStageSelect()
+    {
+        // Build index 1 = StageSelect.unity
+        SceneManager.LoadScene(1);
+    }
     // ═════════════════════════════════════════════════════════════════════
 
     Canvas GetMainCanvas()
