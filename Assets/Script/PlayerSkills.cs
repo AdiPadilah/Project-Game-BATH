@@ -135,7 +135,7 @@ public class PlayerSkills : MonoBehaviour
     // ─────────────────────────────────────────────────────────────────────────
     // SKILL 1 [A]: Phantom Thrust (Tebasan Terobos Kilat Cahaya Emas)
     // ─────────────────────────────────────────────────────────────────────────
-    private void TryCastSkill1()
+    public void TryCastSkill1()
     {
         if (skill1Timer > 0f) return;
         if (player.GetCurrentMana() < skill1Cost) return;
@@ -209,7 +209,7 @@ public class PlayerSkills : MonoBehaviour
     // ─────────────────────────────────────────────────────────────────────────
     // SKILL 2 [S]: Cyclone Crescent (Badai Tebasan Emas 360 Derajat Area)
     // ─────────────────────────────────────────────────────────────────────────
-    private void TryCastSkill2()
+    public void TryCastSkill2()
     {
         if (skill2Timer > 0f) return;
         if (player.GetCurrentMana() < skill2Cost) return;
@@ -269,7 +269,7 @@ public class PlayerSkills : MonoBehaviour
     // ─────────────────────────────────────────────────────────────────────────
     // SKILL 3 [W]: Judgement of the End (ULTIMATE Mahadewa Tebasan Dimensi)
     // ─────────────────────────────────────────────────────────────────────────
-    private void TryCastSkill3()
+    public void TryCastSkill3()
     {
         if (skill3Timer > 0f) return;
         if (player.GetCurrentMana() < skill3Cost) return;

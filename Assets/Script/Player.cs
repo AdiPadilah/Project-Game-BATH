@@ -217,7 +217,7 @@ public class Player : Entity
         }
     }
 
-    private void TryAttack()
+    public void TryAttack()
     {
         if (isDashing || isDead) return;
 
@@ -510,6 +510,25 @@ public class Player : Entity
         if (audioSource != null && clip != null)
         {
             audioSource.PlayOneShot(clip, 0.9f);
+        }
+    }
+
+    public void PerformJump()
+    {
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+            PlayJumpSound();
+            justJumped = true;
+        }
+    }
+
+    public void PerformDash(float dir = 0f)
+    {
+        if (dir == 0f) dir = facingRight ? 1f : -1f;
+        if (!isDashing)
+        {
+            StartCoroutine(DashRoutine(dir));
         }
     }
 
