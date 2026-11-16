@@ -12,7 +12,6 @@ public static class ForceReloadMenu
     static ForceReloadMenu()
     {
         EditorApplication.playModeStateChanged += OnModeChanged;
-        EditorApplication.delayCall += TryReload;
     }
 
     static void OnModeChanged(PlayModeStateChange state)

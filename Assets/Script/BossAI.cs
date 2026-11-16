@@ -105,6 +105,12 @@ public class BossAI : Entity
         base.Awake();
         currentHealth = maxHealth;
 
+        // Skala Damage Skill Bos berdasarkan Tingkat Kesulitan
+        float dmgMult = DifficultyManager.GetEnemyDamageMultiplier();
+        skill1Damage     = Mathf.Max(1, Mathf.RoundToInt(skill1Damage * dmgMult));
+        skill3BallDamage = Mathf.Max(1, Mathf.RoundToInt(skill3BallDamage * dmgMult));
+        skill3BreathDmg  = Mathf.Max(1, Mathf.RoundToInt(skill3BreathDmg * dmgMult));
+
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null) player = p.transform;
 

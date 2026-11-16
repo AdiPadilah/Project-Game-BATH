@@ -295,12 +295,15 @@ public class CharacterSelectScene : MonoBehaviour
         CreateGoldDivider(header.transform, 1f, 0f);
         CreateGoldDivider(header.transform, 0f, 0f);
 
-        TMP_Text title = CreateTMP(header.transform, "Title", 28f, FontStyles.Bold,
+        TMP_Text title = CreateTMP(header.transform, "Title", 26f, FontStyles.Bold,
             new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
         title.rectTransform.anchorMin = Vector2.zero; title.rectTransform.anchorMax = Vector2.one;
         title.rectTransform.offsetMin = Vector2.zero; title.rectTransform.offsetMax = Vector2.zero;
-        title.characterSpacing = 4f;
-        title.text = "✦  PILIH KESATRIA ANDA  ✦";
+        title.characterSpacing = 3f;
+
+        string stageName = PlayerPrefs.GetString("TargetStageName", "STAGE 1");
+        string diffTitle = DifficultyManager.GetDifficultyTitle(DifficultyManager.CurrentDifficulty);
+        title.text = $"✦  PILIH KESATRIA  •  {stageName}  [{diffTitle}]  ✦";
     }
 
     // ─────────────────────────────────────────────────────────────────────

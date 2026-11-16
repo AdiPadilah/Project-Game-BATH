@@ -173,15 +173,18 @@ public class StageObjectiveOverlay : MonoBehaviour
         CreateGoldDivider(briefingModal.transform, 1f, 0f);
         CreateGoldDivider(briefingModal.transform, 0f, 0f);
 
-        // Header Tag
+        // Header Tag (dengan Tingkat Kesulitan)
+        string diffTitle = DifficultyManager.GetDifficultyTitle(DifficultyManager.CurrentDifficulty);
+        Color diffColor  = DifficultyManager.GetDifficultyColor(DifficultyManager.CurrentDifficulty);
+
         TMP_Text txtHeader = CreateTMP(briefingModal.transform, "TxtHeader", 15f, FontStyles.Bold,
-            new Color(1f, 0.85f, 0.35f, 1f), TextAlignmentOptions.Center);
+            diffColor, TextAlignmentOptions.Center);
         RectTransform hRT = txtHeader.rectTransform;
         hRT.anchorMin = new Vector2(0f, 1f); hRT.anchorMax = new Vector2(1f, 1f);
         hRT.pivot     = new Vector2(0.5f, 1f);
         hRT.anchoredPosition = new Vector2(0f, -22f);
         hRT.sizeDelta = new Vector2(0f, 26f);
-        txtHeader.text = "✦ SASARAN MISI: STAGE 1 ✦";
+        txtHeader.text = $"✦ SASARAN MISI: STAGE 1  •  [{diffTitle}] ✦";
 
         // Stage Title
         TMP_Text txtTitle = CreateTMP(briefingModal.transform, "TxtTitle", 28f, FontStyles.Bold,

@@ -57,6 +57,16 @@ public class Entity : MonoBehaviour
             defaultMaterial = sr.material;
         }
 
+        // Skala Tingkat Kesulitan untuk Musuh dan Boss (Player tetap normal)
+        if (!(this is Player))
+        {
+            float hpMult  = DifficultyManager.GetEnemyHealthMultiplier();
+            float dmgMult = DifficultyManager.GetEnemyDamageMultiplier();
+
+            maxHealth    = Mathf.Max(1, Mathf.RoundToInt(maxHealth * hpMult));
+            attackDamage = Mathf.Max(1, Mathf.RoundToInt(attackDamage * dmgMult));
+        }
+
         // Logika agar darah penuh saat game pertama kali dijalankan
         if (currentHealth <= 0)
         {
