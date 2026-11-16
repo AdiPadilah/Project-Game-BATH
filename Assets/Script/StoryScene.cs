@@ -6,12 +6,12 @@ using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// StoryScene — Cutscene Latar Belakang Karakter bergaya Manhwa Sinematik.
-/// Dipicu otomatis setelah Tutorial selesai (Kematian Boss Slime King di GamePlay)
-/// atau dapat dibaca kapan saja melalui menu Pemilihan Karakter.
-/// 
-/// Mengisahkan masa lalu tragis, alasan bertahan hidup, dan sumpah/ambisi ksatria.
-/// Dilengkapi potret ekspresif, efek typewriter, navigasi panel, dan transisi ke Stage 1 (Penyelamatan).
+/// StoryScene — Cutscene Latar Belakang Karakter bergaya Manhwa Sinematik (Sesuai Referensi Webtoon/Solo Leveling).
+/// - Ilustrasi Manhwa Besar di Tengah Layar (Framed Art Panel)
+/// - Efek Onomatopoeia / SFX Teks Manhwa Korea/Dark Fantasy (e.g. 콰아아앙! / ROAR!)
+/// - Kotak Dialog & Narasi Manhwa dengan Badge Pembicara Berwarna
+/// - Kontrol Navigasi: [ ◄ SEBELUMNYA ], [ LANJUTKAN ► ], [ LEWATI (SKIP) ]
+/// - Typewriter Effect per huruf dengan skip saat klik
 /// </summary>
 public class StoryScene : MonoBehaviour
 {
@@ -41,63 +41,80 @@ public class StoryScene : MonoBehaviour
     private Sprite modalPanelSprite;
     private Sprite btnFantasyNormal;
     private Sprite btnFantasyHover;
+    private Sprite btnFantasyPressed;
     private Sprite screenVignette;
+
+    // Manhwa Scene Art Sprites
+    private Sprite artAshenvaleFall;
+    private Sprite artEloraKidnapped;
+    private Sprite artKaelenAwakening;
+    private Sprite artAncientRuins;
     private Sprite portraitKaelen;
     private Sprite portraitValeria;
+
     private TMP_FontAsset tmpFont;
     private AudioClip sfxClick;
     private AudioClip sfxPage;
+    private AudioClip sfxImpact;
     private AudioSource audioSource;
 
-    // ── UI Root ───────────────────────────────────────────────────────────
+    // ── UI Root Elements ──────────────────────────────────────────────────
     private Canvas canvas;
     private Image fadeOverlay;
     private RectTransform fadeRT;
 
-    // Current panel UI
-    private GameObject panelRoot;
-    private TMP_Text txtNarrative;
-    private TMP_Text txtSpeaker;
-    private TMP_Text txtPageNum;
-    private Image imgBackground;
-    private Image leftVignette;
-    private Image imgHeroPortrait;
-    private RectTransform heroPortraitRT;
-    private TMP_Text txtHeroTitleBadge;
-    private TMP_Text txtChapterQuote;
-    private Button btnNext;
-    private TMP_Text btnNextLabel;
+    // Central Manhwa Artwork Frame
+    private GameObject manhwaFrameGO;
+    private Image imgManhwaArt;
+    private Image imgArtGlow;
+    private TMP_Text txtManhwaSFX;          // Onomatopoeia floating text (콰아아앙!)
+    private TMP_Text txtChapterTag;         // Episode/Chapter tag top-right of art
 
-    // ── State ─────────────────────────────────────────────────────────────
-    private List<StoryPanel> panels = new List<StoryPanel>();
-    private int currentPanel = 0;
+    // Dialogue / Caption Overlay Box
+    private GameObject captionBoxGO;
+    private TMP_Text txtSpeakerBadge;
+    private Image imgSpeakerPill;
+    private TMP_Text txtNarrativeDialogue;
+    private TMP_Text txtChapterSubtitle;
+
+    // Navigation Controls
+    private Button btnPrev;
+    private Button btnNext;
+    private TMP_Text txtBtnNextLabel;
+    private Button btnSkip;
+    private TMP_Text txtPageCounter;
+    private Image[] pageDotImgs;
+
+    // ── Story State ───────────────────────────────────────────────────────
+    private class StoryBeat
+    {
+        public string chapterTag;       // e.g. "EPISODE 0 • HARI KEHANCURAN"
+        public string onomatopoeia;     // e.g. "《 콰아아앙! (KABOOM!) 》"
+        public string speaker;          // e.g. "KAELEN", "NARASI", "ELORA"
+        public string subtitle;         // e.g. "Masa Lalu yang Terbakar di Ashenvale"
+        public string text;             // Isi cerita lengkap
+        public Sprite artSprite;        // Gambar ilustrasi manhwa
+        public Color moodColor;         // Warna tema (merah/ungu/emas/biru)
+        public Color sfxColor;          // Warna teks onomatopoeia
+        public string nextBtnLabel;     // e.g. "▶ Lanjutkan", "⚔ Mulai Misi Stage 1"
+        public bool isClimax;
+    }
+
+    private List<StoryBeat> beats = new List<StoryBeat>();
+    private int currentBeatIndex = 0;
     private bool isTransitioning = false;
     private bool isTyping = false;
     private Coroutine typingCoroutine;
-    private string currentHeroName = "Kaelen";
-
-    // ── Story Panel Data ──────────────────────────────────────────────────
-    private class StoryPanel
-    {
-        public string speaker;        // Nama pembicara / narasi
-        public string chapterQuote;   // Kutipan dramatis ala manhwa di atas
-        public string text;           // Isi narasi/dialog
-        public Color textColor;       // Warna teks narasi
-        public Color bgColor;         // Warna latar panel
-        public Color vignetteColor;   // Warna vignette
-        public string btnLabel;       // Label tombol next
-        public bool isFullNarration;  // True = narasi penuh (bukan dialog)
-        public string mood;           // "sad", "rage", "resolve", "normal"
-    }
+    private string selectedHeroName = "Kaelen";
 
     private void Awake()
     {
         audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
 
-        currentHeroName = PlayerPrefs.GetString("SelectedCharacterName", "Kaelen");
+        selectedHeroName = PlayerPrefs.GetString("SelectedCharacterName", "Kaelen");
         LoadAssets();
-        BuildStoryPanels();
+        BuildStoryBeats();
     }
 
     private void LoadAssets()
@@ -105,170 +122,182 @@ public class StoryScene : MonoBehaviour
         modalPanelSprite = Resources.Load<Sprite>("UI/panel_fantasy_modal");
         btnFantasyNormal = Resources.Load<Sprite>("UI/btn_fantasy_normal");
         btnFantasyHover  = Resources.Load<Sprite>("UI/btn_fantasy_hover");
+        btnFantasyPressed= Resources.Load<Sprite>("UI/btn_fantasy_pressed");
         screenVignette   = Resources.Load<Sprite>("UI/screen_vignette");
-        portraitKaelen   = Resources.Load<Sprite>("UI/hud_player_portrait");
-        portraitValeria  = Resources.Load<Sprite>("UI/hud_valeria_portrait");
 
-        sfxClick         = Resources.Load<AudioClip>("Audio/ui_click");
-        sfxPage          = Resources.Load<AudioClip>("Audio/ui_hover");
-        tmpFont          = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        // Manhwa Art Sprites
+        artAshenvaleFall   = Resources.Load<Sprite>("UI/Story/manhwa_ashenvale_fall");
+        artEloraKidnapped  = Resources.Load<Sprite>("UI/Story/manhwa_elora_kidnapped");
+        artKaelenAwakening = Resources.Load<Sprite>("UI/Story/manhwa_kaelen_awakening");
+        artAncientRuins    = Resources.Load<Sprite>("UI/Story/manhwa_ancient_ruins_rescue");
+
+        portraitKaelen     = Resources.Load<Sprite>("UI/hud_player_portrait");
+        portraitValeria    = Resources.Load<Sprite>("UI/hud_valeria_portrait");
+
+        // Fallback jika belum ada sprite
+        if (artAshenvaleFall == null) artAshenvaleFall = Resources.Load<Sprite>("UI/menu_background");
+        if (artEloraKidnapped == null) artEloraKidnapped = artAshenvaleFall;
+        if (artKaelenAwakening == null) artKaelenAwakening = artAshenvaleFall;
+        if (artAncientRuins == null) artAncientRuins = artAshenvaleFall;
+
+        sfxClick  = Resources.Load<AudioClip>("Audio/ui_click");
+        sfxPage   = Resources.Load<AudioClip>("Audio/ui_hover");
+        sfxImpact = Resources.Load<AudioClip>("Audio/star_1");
+        tmpFont   = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
     }
 
-    private void BuildStoryPanels()
+    private void BuildStoryBeats()
     {
-        bool isKaelen = (currentHeroName != "Valeria");
+        bool isKaelen = (selectedHeroName != "Valeria");
 
         if (isKaelen)
-            BuildKaelenStory();
+        {
+            // ── KISAH KAELEN (THE SHADOW BLADER) ──────────────────────────
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 0  •  HARI KEHANCURAN",
+                onomatopoeia  = "《 콰아아앙! (KABOOM!) 》",
+                speaker       = "NARASI",
+                subtitle      = "10 Tahun Lalu — Di Balik Kabut Gunung Ashenvale",
+                text          = "Dunia runtuh bukan dengan jeritan, melainkan kobaran api yang membakar habis semua kenangan.\n\nKaelen lahir sebagai putra pandai besi biasa. Dia tidak memiliki kekuatan sakti, hanya sebilah palu tempa dan mimpi sederhana: melihat laut lepas bersama adik perempuannya yang paling dicintai, <color=#FFD6A5>Elora</color>.",
+                artSprite     = artAshenvaleFall,
+                moodColor     = new Color(1.0f, 0.55f, 0.20f, 1f), // Oranye Api
+                sfxColor      = new Color(1.0f, 0.40f, 0.15f, 1f),
+                nextBtnLabel  = "▶  Lanjutkan [SPACE]",
+                isClimax      = false
+            });
+
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 1  •  GERBANG ABYSSAL TERBUKA",
+                onomatopoeia  = "《 쿠구구구... (ROAR!) 》",
+                speaker       = "TRAGEDI DESA ASHENVALE",
+                subtitle      = "Malam Merah Darah & Serbuan Pasukan Jurang",
+                text          = "Malam itu... langit terbelah dan tanah memuntahkan jutaan taring neraka.\n\nGerbang Abyssal runtuh tepat di atas desa mereka. Ayah Kaelen gugur tertembus tombak iblis saat menahan pintu rumah. Ibunya lenyap ditelan api neraka. Kaelen memeluk erat tangan Elora sambil berlari sekuat tenaga menembus puing-puing membara.",
+                artSprite     = artAshenvaleFall,
+                moodColor     = new Color(0.95f, 0.20f, 0.15f, 1f), // Merah Darah
+                sfxColor      = new Color(1.0f, 0.20f, 0.10f, 1f),
+                nextBtnLabel  = "▶  Teruskan...",
+                isClimax      = false
+            });
+
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 2  •  PERPISAHAN YANG TRAGIS",
+                onomatopoeia  = "《 쩌적—! (SNAP!) 》",
+                speaker       = "KAELEN (MASA LALU)",
+                subtitle      = "Genggaman Tangan yang Terlepas di Hadapan Maut",
+                text          = "\"ELORA! PEGANG TANGANKU! JANGAN LEPASKAN!\"\n\n\"Kakak... larilah... hiduplah untukku...\"\n\nSosok demon bertanduk raksasa merenggut Elora ke dalam pusaran portal ungu kegelapan. Pedang tumpul di tangan Kaelen patah berkeping-keping. Genggaman tangannya terlepas... meninggalkan Kaelen menangis darah di atas abu keluarganya.",
+                artSprite     = artEloraKidnapped,
+                moodColor     = new Color(0.70f, 0.25f, 0.90f, 1f), // Ungu Abyssal
+                sfxColor      = new Color(0.85f, 0.35f, 1.00f, 1f),
+                nextBtnLabel  = "▶  Teruskan...",
+                isClimax      = true
+            });
+
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 3  •  SUMPAH PEDANG BAYANGAN",
+                onomatopoeia  = "《 샤아아—! (SHADOW AWAKENING) 》",
+                speaker       = "SUMPAH KSATRIA BAYANGAN",
+                subtitle      = "Kelemahan Adalah Dosa Terbesar di Dunia Ini",
+                text          = "Kaelen memohon pertolongan pada Ksatria Suci Kerajaan, namun mereka menolak dan mengejeknya: \"Gadis itu sudah mati. Menyerahlah, bocah abu.\"\n\nDi malam tanpa bintang itu, Kaelen menancapkan pedang berkarat dan menelan pecahan <color=#8060FF>Inti Bayangan Terlarang</color>.\n\n\"Jika dewa dan ksatria suci berpaling... maka aku akan merangkul kegelapan! Aku bersumpah akan menjadi ksatria terkuat dan membelah setiap iblis hingga Elora kembali!\"",
+                artSprite     = artKaelenAwakening,
+                moodColor     = new Color(0.30f, 0.70f, 1.00f, 1f), // Biru Listrik
+                sfxColor      = new Color(0.40f, 0.85f, 1.00f, 1f),
+                nextBtnLabel  = "▶  Menuju Medan Tempur",
+                isClimax      = true
+            });
+
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 4  •  PETUNJUK STAGE 1: LEMBAH RERUNTUHAN",
+                onomatopoeia  = "《 척! (THE RESCUE BEGINS) 》",
+                speaker       = "PANGGILAN PENYELAMATAN",
+                subtitle      = "Seorang Tawanan Memegang Kunci Lokasi Elora",
+                text          = "10 TAHUN BERLALU — SEUSAI MENAKLUKKAN RAJA SLIME DI HUTAN TERLARANG\n\nKaelen menemukan kabar pasti: Seorang tawanan penyintas dari kuil kuno disekap oleh pasukan iblis di kedalaman <color=#FFD6A5>Lembah Reruntuhan Kuno</color>!\nTawanan ini adalah satu-satunya saksi yang mengetahui ruang rahasia tempat Elora ditawan.\n\n\"Aku tidak akan membiarkan penyesalan yang sama terulang lagi. Bertahanlah, aku datang!\"",
+                artSprite     = artAncientRuins,
+                moodColor     = new Color(1.0f, 0.85f, 0.35f, 1f), // Emas Harapan
+                sfxColor      = new Color(1.0f, 0.90f, 0.40f, 1f),
+                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1",
+                isClimax      = true
+            });
+        }
         else
-            BuildValeriaStory();
-    }
+        {
+            // ── KISAH VALERIA (THE CRIMSON VALKYRIE) ──────────────────────
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 0  •  MAWAR CRIMSON",
+                onomatopoeia  = "《 휘이잉... (COLD BLIZZARD) 》",
+                speaker       = "NARASI",
+                subtitle      = "15 Tahun Lalu — Badai Salju Perbatasan Timur",
+                text          = "Mawar yang mekar di atas genangan darah tidak pernah mengenal kehangatan mentari.\n\nValeria terlahir dengan mata crimson merah menyala. Keluarganya adalah tabib pengelana yang dicintai rakyat jelata. Kakak laki-lakinya, <color=#FF8080>Lian</color>, selalu melindunginya dari dinginnya malam dengan senyuman hangat.",
+                artSprite     = artAshenvaleFall,
+                moodColor     = new Color(1.0f, 0.50f, 0.60f, 1f),
+                sfxColor      = new Color(1.0f, 0.40f, 0.50f, 1f),
+                nextBtnLabel  = "▶  Lanjutkan [SPACE]",
+                isClimax      = false
+            });
 
-    private void BuildKaelenStory()
-    {
-        // ── KAELEN: THE SHADOW BLADE ──────────────────────────────────────
-        panels.Add(new StoryPanel {
-            speaker       = "[ PROLOG: HARI KEHANCURAN ]",
-            chapterQuote  = "\"Dunia runtuh bukan dengan jeritan... melainkan dengan kobaran api yang membakar habis semua kenangan.\"",
-            text          = "10 TAHUN LALU — DI BALIK KABUT GUNUNG ASHENVALE\n\nKaelen lahir sebagai anak seorang pandai besi biasa. Dia tidak mewarisi darah ksatria bangsawan, melainkan sebilah palu tempa dan mimpi sederhana: melihat laut lepas bersama adik perempuannya, <color=#FFD6A5>Elora</color>.",
-            textColor     = new Color(1f, 0.95f, 0.88f, 1f),
-            bgColor       = new Color(0.06f, 0.04f, 0.10f, 1f),
-            vignetteColor = new Color(0.12f, 0.02f, 0.05f, 0.65f),
-            btnLabel      = "▶  Lanjutkan",
-            isFullNarration = true,
-            mood          = "normal"
-        });
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 1  •  MALAM PENYERGAPAN BERDARAH",
+                onomatopoeia  = "《 캉! 캉—! (CLASH!) 》",
+                speaker       = "TRAGEDI KELUARGA VALERIA",
+                subtitle      = "Keserakahan Klan Pembunuh Bayangan",
+                text          = "Demi merebut pusaka <color=#FF5050>Elixir Darah Murni</color>, ordo pembunuh bayaran gelap menyerbu rumah mereka. Ayah dan ibu tewas membeku di depan pintu.\n\nLian menarik Valeria kecil ke dalam lemari tersembunyi dan menguncinya dari luar.\n\"Valeria... jangan menangis. Hiduplah. Untuk kakak!\"",
+                artSprite     = artAshenvaleFall,
+                moodColor     = new Color(0.95f, 0.15f, 0.15f, 1f),
+                sfxColor      = new Color(1.0f, 0.20f, 0.20f, 1f),
+                nextBtnLabel  = "▶  Teruskan...",
+                isClimax      = false
+            });
 
-        panels.Add(new StoryPanel {
-            speaker       = "TRAGEDI DESA ASHENVALE",
-            chapterQuote  = "\"Malam dimana langit terbelah dan tanah memuntahkan jutaan taring neraka.\"",
-            text          = "Namun takdir kejam tidak memberinya waktu.\n\nGerbang Abyssal runtuh terbuka tepat di atas desa mereka. Langit berubah menjadi merah darah. Makhluk-makhluk kegelapan membakar setiap rumah dan membantai setiap nyawa.\n\nAyah Kaelen gugur tertembus tombak iblis saat menahan pintu. Ibunya hilang ditelan api.",
-            textColor     = new Color(1f, 0.80f, 0.80f, 1f),
-            bgColor       = new Color(0.14f, 0.02f, 0.03f, 1f),
-            vignetteColor = new Color(0.65f, 0.05f, 0.05f, 0.80f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = true,
-            mood          = "sad"
-        });
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 2  •  PENGORBANAN SANG KAKAK",
+                onomatopoeia  = "《 꽈드득! (DESPAIR) 》",
+                speaker       = "VALERIA (MASA LALU)",
+                subtitle      = "Jeritan Bisu di Balik Celah Pintu Kayu",
+                text          = "Dari celah kayu lemari, Valeria menyaksikan kakaknya disiksa dan diseret hidup-hidup ke dalam gerbang jurang iblis.\n\nIa menggigit bibirnya hingga berdarah agar tidak menjerit. Sejak malam itu, air matanya membeku menjadi racun dendam yang takkan pernah padam.",
+                artSprite     = artEloraKidnapped,
+                moodColor     = new Color(0.70f, 0.15f, 0.40f, 1f),
+                sfxColor      = new Color(0.85f, 0.20f, 0.50f, 1f),
+                nextBtnLabel  = "▶  Teruskan...",
+                isClimax      = true
+            });
 
-        panels.Add(new StoryPanel {
-            speaker       = "KAELEN (MASA LALU)",
-            chapterQuote  = "\"Genggaman tanganku terlepas... dan sejak saat itu, nafasku hanyalah rasa bersalah.\"",
-            text          = "\"ELORA! PEGANG TANGANKU! JANGAN LEPASKAN!\"\n\n\"Kakak... larilah... hidup... lah...\"\n\nSosok iblis bertanduk raksasa merenggut Elora ke dalam kegelapan portal. Kaelen terpental dengan pedang tumpul patah di tangannya. Menangis darah di atas abu keluarganya.",
-            textColor     = new Color(1f, 0.70f, 0.70f, 1f),
-            bgColor       = new Color(0.12f, 0.02f, 0.04f, 1f),
-            vignetteColor = new Color(0.55f, 0.0f, 0.0f, 0.85f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = false,
-            mood          = "sad"
-        });
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 3  •  ALGOJO KEMATIAN DARI JURANG",
+                onomatopoeia  = "《 쉬익—! (CRIMSON FANG) 》",
+                speaker       = "SUMPAH PISAU CRIMSON",
+                subtitle      = "Meminum Darah Iblis Demi Menjadi Predator Terkuat",
+                text          = "Valeria bertahan hidup belasan tahun di jurang kegelapan dengan meminum darah iblis terkutuk dan melatih pisau kembarnya hingga secepat kilat.\n\n\"Aku telah membuang kelemahan hatiku. Pedang kembarku akan menari dalam darah para pembantai itu hingga Lian kembali ke pelukanku!\"",
+                artSprite     = artKaelenAwakening,
+                moodColor     = new Color(1.0f, 0.20f, 0.25f, 1f),
+                sfxColor      = new Color(1.0f, 0.35f, 0.35f, 1f),
+                nextBtnLabel  = "▶  Menuju Medan Tempur",
+                isClimax      = true
+            });
 
-        panels.Add(new StoryPanel {
-            speaker       = "PENGKHIANATAN & KEPUTUSASAAN",
-            chapterQuote  = "\"Mereka yang bersumpah melindungi rakyat... hanyalah pengecut bertopeng emas.\"",
-            text          = "Dengan tubuh bersimbah darah, Kaelen merangkak ke markas <color=#FFD6A5>Ordo Ksatria Suci Kerajaan</color> memohon pertolongan.\n\nTetapi para ksatria agung menolak melangkah ke zona terlarang.\n\n\"Lembah itu terkutuk. Gadis kecil itu sudah mati. Menyerahlah, bocah abu.\"",
-            textColor     = new Color(0.95f, 0.80f, 0.65f, 1f),
-            bgColor       = new Color(0.09f, 0.05f, 0.04f, 1f),
-            vignetteColor = new Color(0.40f, 0.15f, 0.02f, 0.70f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = true,
-            mood          = "rage"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "SUMPAH SANG KSATRIA BAYANGAN",
-            chapterQuote  = "\"Jika dewa dan ksatria suci berpaling... maka aku akan memeluk kegelapan demi menyelamatkannya!\"",
-            text          = "Di malam dingin tanpa bintang itu, Kaelen menancapkan pedang berkarat ke tanah dan menelan pecahan <color=#8060FF>Batu Inti Bayangan Terlarang</color>.\n\n\"Kelemahan adalah dosa terbesar di dunia yang telah binasa ini.\"\n\n\"Aku bersumpah... aku akan menjadi lebih kuat dari siapapun. Aku akan membelah setiap monster di dunia ini hingga Elora kembali!\"",
-            textColor     = new Color(1f, 0.70f, 0.35f, 1f),
-            bgColor       = new Color(0.06f, 0.03f, 0.12f, 1f),
-            vignetteColor = new Color(0.40f, 0.05f, 0.50f, 0.85f),
-            btnLabel      = "▶  Menuju Medan Tempur",
-            isFullNarration = false,
-            mood          = "resolve"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "PETUNJUK DI LEMBAH RERUNTUHAN",
-            chapterQuote  = "\"Secercah cahaya di ujung keputusasaan... seorang penyintas memegang kuncinya.\"",
-            text          = "10 TAHUN BERLALU — SEUSAI MENAKLUKKAN HUTAN TERLARANG\n\nKaelen menemukan kabar angin: Seorang tawanan penyintas dari kuil kuno berhasil melihat tahanan yang dibawa ke kedalaman <color=#70D0FF>Lembah Reruntuhan Kuno</color>!\n\nOrang itu disekap oleh regu algojo iblis. Kaelen harus menyelamatkannya sebelum rahasia lokasi adiknya terkubur selamanya!",
-            textColor     = new Color(0.90f, 0.95f, 1.0f, 1f),
-            bgColor       = new Color(0.04f, 0.06f, 0.14f, 1f),
-            vignetteColor = new Color(0.05f, 0.20f, 0.45f, 0.75f),
-            btnLabel      = "⚔  Mulai Penyelamatan Stage 1",
-            isFullNarration = true,
-            mood          = "resolve"
-        });
-    }
-
-    private void BuildValeriaStory()
-    {
-        // ── VALERIA: THE CRIMSON VALKYRIE ─────────────────────────────────
-        panels.Add(new StoryPanel {
-            speaker       = "[ PROLOG: MAWAR CRIMSON ]",
-            chapterQuote  = "\"Mawar yang tumbuh di atas genangan darah tidak pernah mengenal arti kehangatan mentari.\"",
-            text          = "15 TAHUN LALU — DI WILAYAH PERBATASAN TIMUR\n\nValeria terlahir dengan mata crimson yang menyala. Di masa kecilnya, keluarganya adalah tabib pengelana yang dicintai rakyat jelata karena menyembuhkan wabah tanpa pamrih.\n\nKakak lelakinya, <color=#FF8080>Lian</color>, adalah pelindung terbaik yang selalu menggenggam tangannya saat malam tiba.",
-            textColor     = new Color(1f, 0.90f, 0.85f, 1f),
-            bgColor       = new Color(0.08f, 0.03f, 0.08f, 1f),
-            vignetteColor = new Color(0.20f, 0.02f, 0.10f, 0.65f),
-            btnLabel      = "▶  Lanjutkan",
-            isFullNarration = true,
-            mood          = "normal"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "MALAM PENYERGAPAN",
-            chapterQuote  = "\"Keserakahan manusia lebih berbisa daripada racun iblis manapun.\"",
-            text          = "Sebuah ordo pembunuh bayaran gelap menginginkan pusaka <color=#FF6060>Elixir Darah Murni</color> warisan klan mereka.\n\nDi tengah malam badai salju, rumah mereka diserang. Ayah dan ibu tewas membeku di depan pintu. Lian menarik Valeria kecil ke dalam lemari sembunyi dan menguncinya dari luar.\n\n\"Valeria... jangan buat suara apapun. Hiduplah. Untuk kakak.\"",
-            textColor     = new Color(1f, 0.75f, 0.75f, 1f),
-            bgColor       = new Color(0.15f, 0.02f, 0.04f, 1f),
-            vignetteColor = new Color(0.65f, 0.05f, 0.05f, 0.85f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = true,
-            mood          = "sad"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "VALERIA (MASA LALU)",
-            chapterQuote  = "\"Air mata yang membeku menjadi racun dendam tak berujung.\"",
-            text          = "Dari celah kayu lemari, Valeria menyaksikan kakaknya disiksa dan diseret hidup-hidup ke dalam gerbang jurang iblis.\n\nIa menangis tanpa suara hingga pita suaranya berdarah. Sendirian di dunia yang membeku tanpa siapapun yang memeluknya lagi.",
-            textColor     = new Color(1f, 0.65f, 0.65f, 1f),
-            bgColor       = new Color(0.12f, 0.02f, 0.03f, 1f),
-            vignetteColor = new Color(0.55f, 0.0f, 0.0f, 0.85f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = false,
-            mood          = "sad"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "PELATIHAN DI NERAKA BAYANGAN",
-            chapterQuote  = "\"Aku meminum racun darah ini bukan untuk mati... tapi untuk menjadi algojo kematian itu sendiri!\"",
-            text          = "Valeria bertahan hidup dengan meminum darah iblis terkutuk dan melatih pisau kembarnya di jurang kematian selama belasan tahun.\n\nSetiap luka sayat adalah pengingat. Setiap tetes darah adalah api dendam.\n\n\"Aku telah membuang kelemahan hatiku. Tidak ada lagi tangisan.\"",
-            textColor     = new Color(1f, 0.60f, 0.60f, 1f),
-            bgColor       = new Color(0.07f, 0.02f, 0.06f, 1f),
-            vignetteColor = new Color(0.40f, 0.0f, 0.15f, 0.80f),
-            btnLabel      = "▶  Teruskan...",
-            isFullNarration = false,
-            mood          = "rage"
-        });
-
-        panels.Add(new StoryPanel {
-            speaker       = "HARAPAN TERAKHIR DI STAGE 1",
-            chapterQuote  = "\"Kakak masih hidup... dan aku akan membongkar gerbang neraka untuk membawanya pulang!\"",
-            text          = "SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nValeria menemukan medali perak berlumuran darah milik kakaknya pada salah satu jasad iblis!\n\nJejak itu mengarah ke <color=#FF8080>Lembah Reruntuhan Kuno</color> — dimana seorang sandera penting ditawan oleh pasukan kegelapan. Sandera itu adalah satu-satunya saksi yang tahu dimana ruang penyiksaan kakaknya disembunyikan!\n\n\"Tunggu aku, Kakak. Aku datang.\"",
-            textColor     = new Color(1f, 0.85f, 0.85f, 1f),
-            bgColor       = new Color(0.06f, 0.02f, 0.08f, 1f),
-            vignetteColor = new Color(0.30f, 0.05f, 0.20f, 0.80f),
-            btnLabel      = "⚔  Mulai Penyelamatan Stage 1",
-            isFullNarration = true,
-            mood          = "resolve"
-        });
+            beats.Add(new StoryBeat {
+                chapterTag    = "EPISODE 4  •  PENYELAMATAN STAGE 1: LEMBAH RERUNTUHAN",
+                onomatopoeia  = "《 팟! (HUNTING STARTS) 》",
+                speaker       = "PANGGILAN PENYELAMATAN",
+                subtitle      = "Medali Perak Sang Kakak Ditemukan di Reruntuhan Kuno",
+                text          = "SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nValeria menemukan medali perak milik Lian pada salah satu jasad iblis!\nJejak itu mengarah ke <color=#FF8080>Lembah Reruntuhan Kuno</color> — dimana seorang sandera penting disekap oleh algojo iblis. Sandera ini mengetahui lokasi ruang bawah tanah tempat kakaknya disekap!\n\n\"Tunggu aku, Kakak. Siapapun yang menghalangi jalan ini akan kubakar habis!\"",
+                artSprite     = artAncientRuins,
+                moodColor     = new Color(1.0f, 0.80f, 0.30f, 1f),
+                sfxColor      = new Color(1.0f, 0.85f, 0.35f, 1f),
+                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1",
+                isClimax      = true
+            });
+        }
     }
 
     private void Start()
     {
         FindOrBuildCanvas();
-        BuildStaticUI();
-        StartCoroutine(FadeInThenShowPanel(0));
+        BuildAtmosphere();
+        BuildTopHeader();
+        BuildCentralManhwaFrame();
+        BuildCaptionDialogueBox();
+        BuildBottomNavBar();
+
+        ShowBeat(0, false);
     }
 
     private void FindOrBuildCanvas()
@@ -297,314 +326,421 @@ public class StoryScene : MonoBehaviour
         fadeRT.offsetMin = Vector2.zero; fadeRT.offsetMax = Vector2.zero;
         fadeGO.transform.SetAsLastSibling();
         fadeOverlay = fadeGO.AddComponent<Image>();
-        fadeOverlay.color = Color.black;
+        fadeOverlay.color = new Color(0f, 0f, 0f, 1f);
         fadeOverlay.raycastTarget = false;
     }
 
-    private void BuildStaticUI()
+    private void BuildAtmosphere()
     {
-        // ── FULLSCREEN BACKGROUND ─────────────────────────────────────────
-        panelRoot = new GameObject("StoryPanel");
-        panelRoot.transform.SetParent(canvas.transform, false);
-        panelRoot.transform.SetSiblingIndex(0);
-
-        RectTransform rootRT = panelRoot.AddComponent<RectTransform>();
-        rootRT.anchorMin = Vector2.zero; rootRT.anchorMax = Vector2.one;
-        rootRT.offsetMin = Vector2.zero; rootRT.offsetMax = Vector2.zero;
-
-        imgBackground = panelRoot.AddComponent<Image>();
-        imgBackground.color = new Color(0.07f, 0.04f, 0.12f, 1f);
+        // Dark Base
+        GameObject baseBG = new GameObject("BaseDarkBG");
+        baseBG.transform.SetParent(canvas.transform, false);
+        baseBG.transform.SetSiblingIndex(0);
+        RectTransform brt = baseBG.AddComponent<RectTransform>();
+        brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one;
+        brt.offsetMin = Vector2.zero; brt.offsetMax = Vector2.zero;
+        Image bi = baseBG.AddComponent<Image>();
+        bi.color = new Color(0.04f, 0.02f, 0.08f, 1f);
 
         // Screen Vignette
         if (screenVignette != null)
         {
             GameObject vigGO = new GameObject("ScreenVignette");
-            vigGO.transform.SetParent(panelRoot.transform, false);
+            vigGO.transform.SetParent(canvas.transform, false);
+            vigGO.transform.SetSiblingIndex(1);
             RectTransform vrt = vigGO.AddComponent<RectTransform>();
             vrt.anchorMin = Vector2.zero; vrt.anchorMax = Vector2.one;
             vrt.offsetMin = Vector2.zero; vrt.offsetMax = Vector2.zero;
-
-            leftVignette = vigGO.AddComponent<Image>();
-            leftVignette.sprite = screenVignette;
-            leftVignette.color = new Color(0.5f, 0f, 0f, 0.7f);
-            leftVignette.raycastTarget = false;
+            Image vi = vigGO.AddComponent<Image>();
+            vi.sprite = screenVignette;
+            vi.color  = new Color(1f, 1f, 1f, 0.70f);
+            vi.raycastTarget = false;
         }
+    }
 
-        // ── TOP HEADER BAR ────────────────────────────────────────────────
-        GameObject headerGO = new GameObject("Header");
-        headerGO.transform.SetParent(panelRoot.transform, false);
+    private void BuildTopHeader()
+    {
+        GameObject headerGO = new GameObject("HeaderBar");
+        headerGO.transform.SetParent(canvas.transform, false);
         RectTransform hRT = headerGO.AddComponent<RectTransform>();
-        hRT.anchorMin = new Vector2(0f, 1f); hRT.anchorMax = new Vector2(1f, 1f);
-        hRT.pivot = new Vector2(0.5f, 1f);
-        hRT.anchoredPosition = Vector2.zero;
-        hRT.sizeDelta = new Vector2(0f, 68f);
+        hRT.anchorMin = new Vector2(0.5f, 1f); hRT.anchorMax = new Vector2(0.5f, 1f);
+        hRT.pivot     = new Vector2(0.5f, 1f);
+        hRT.anchoredPosition = new Vector2(0f, 0f);
+        hRT.sizeDelta = new Vector2(1920f, 54f);
 
         Image hImg = headerGO.AddComponent<Image>();
-        hImg.color = new Color(0.04f, 0.02f, 0.08f, 0.96f);
+        hImg.color = new Color(0.05f, 0.03f, 0.10f, 0.95f);
 
-        CreateGoldLine(headerGO.transform, 0f, 0f, true);
+        CreateGoldDivider(headerGO.transform, 0f, 0f);
 
-        TMP_Text txtGameTitle = CreateTMP(headerGO.transform, "GameTitle", 15f, FontStyles.Bold,
-            new Color(0.95f, 0.85f, 0.45f, 0.95f), TextAlignmentOptions.Left);
-        txtGameTitle.rectTransform.anchorMin = new Vector2(0f, 0f);
-        txtGameTitle.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-        txtGameTitle.rectTransform.offsetMin = new Vector2(36f, 0f);
-        txtGameTitle.rectTransform.offsetMax = new Vector2(0f, 0f);
-        txtGameTitle.text = "✦ BORN AFTER THE END  •  KISAH ASAL-USUL KSATRIA ✦";
-        txtGameTitle.characterSpacing = 2f;
+        // Title
+        TMP_Text txtTitle = CreateTMP(headerGO.transform, "Title", 15f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.45f, 1f), TextAlignmentOptions.Left);
+        txtTitle.rectTransform.anchorMin = new Vector2(0f, 0f); txtTitle.rectTransform.anchorMax = new Vector2(0.6f, 1f);
+        txtTitle.rectTransform.offsetMin = new Vector2(40f, 0f); txtTitle.rectTransform.offsetMax = Vector2.zero;
+        txtTitle.characterSpacing = 2f;
+        txtTitle.text = "✦ BORN AFTER THE END  •  PROLOG MANHWA KSATRIA ✦";
 
-        txtPageNum = CreateTMP(headerGO.transform, "PageNum", 14f, FontStyles.Normal,
-            new Color(0.70f, 0.65f, 0.60f, 0.85f), TextAlignmentOptions.Right);
-        txtPageNum.rectTransform.anchorMin = new Vector2(0.5f, 0f);
-        txtPageNum.rectTransform.anchorMax = new Vector2(1f, 1f);
-        txtPageNum.rectTransform.offsetMin = new Vector2(0f, 0f);
-        txtPageNum.rectTransform.offsetMax = new Vector2(-180f, 0f);
+        // Page Counter
+        txtPageCounter = CreateTMP(headerGO.transform, "PageCounter", 14f, FontStyles.Normal,
+            new Color(0.75f, 0.70f, 0.65f, 0.85f), TextAlignmentOptions.Right);
+        txtPageCounter.rectTransform.anchorMin = new Vector2(0.6f, 0f); txtPageCounter.rectTransform.anchorMax = new Vector2(1f, 1f);
+        txtPageCounter.rectTransform.offsetMin = Vector2.zero; txtPageCounter.rectTransform.offsetMax = new Vector2(-180f, 0f);
 
-        // Skip button top-right
+        // Skip Button
         GameObject skipGO = new GameObject("BtnSkip");
         skipGO.transform.SetParent(headerGO.transform, false);
-        RectTransform skipRT = skipGO.AddComponent<RectTransform>();
-        skipRT.anchorMin = new Vector2(1f, 0.5f);
-        skipRT.anchorMax = new Vector2(1f, 0.5f);
-        skipRT.pivot     = new Vector2(1f, 0.5f);
-        skipRT.sizeDelta = new Vector2(130f, 36f);
-        skipRT.anchoredPosition = new Vector2(-24f, 0f);
+        RectTransform sRT = skipGO.AddComponent<RectTransform>();
+        sRT.anchorMin = new Vector2(1f, 0.5f); sRT.anchorMax = new Vector2(1f, 0.5f);
+        sRT.pivot     = new Vector2(1f, 0.5f);
+        sRT.sizeDelta = new Vector2(120f, 32f);
+        sRT.anchoredPosition = new Vector2(-30f, 0f);
 
-        Image skipImg = skipGO.AddComponent<Image>();
-        if (btnFantasyNormal != null) { skipImg.sprite = btnFantasyNormal; skipImg.type = Image.Type.Sliced; }
-        skipImg.color = new Color(0.20f, 0.15f, 0.30f, 0.90f);
+        Image sImg = skipGO.AddComponent<Image>();
+        if (btnFantasyNormal != null) { sImg.sprite = btnFantasyNormal; sImg.type = Image.Type.Sliced; }
+        sImg.color = new Color(0.25f, 0.18f, 0.35f, 0.85f);
 
-        Button skipBtn = skipGO.AddComponent<Button>();
-        skipBtn.onClick.AddListener(OnSkipAll);
+        btnSkip = skipGO.AddComponent<Button>();
+        btnSkip.onClick.AddListener(OnSkipAllClicked);
 
-        TMP_Text skipTxt = CreateTMP(skipGO.transform, "SkipLabel", 13f, FontStyles.Normal,
-            new Color(0.85f, 0.80f, 0.70f, 1f), TextAlignmentOptions.Center);
-        skipTxt.rectTransform.anchorMin = Vector2.zero; skipTxt.rectTransform.anchorMax = Vector2.one;
-        skipTxt.rectTransform.offsetMin = Vector2.zero; skipTxt.rectTransform.offsetMax = Vector2.zero;
-        skipTxt.text = "LEWATI [ESC]";
+        TMP_Text sTxt = CreateTMP(skipGO.transform, "Lbl", 12f, FontStyles.Bold,
+            new Color(0.90f, 0.85f, 0.75f, 1f), TextAlignmentOptions.Center);
+        sTxt.rectTransform.anchorMin = Vector2.zero; sTxt.rectTransform.anchorMax = Vector2.one;
+        sTxt.rectTransform.offsetMin = Vector2.zero; sTxt.rectTransform.offsetMax = Vector2.zero;
+        sTxt.text = "LEWATI [ESC]";
+    }
 
-        // ── MANHWA HERO PORTRAIT (Sisi Kiri Atas) ─────────────────────────
-        GameObject portraitContainer = new GameObject("HeroPortraitBox");
-        portraitContainer.transform.SetParent(panelRoot.transform, false);
+    // ─────────────────────────────────────────────────────────────────────
+    // CENTRAL MANHWA ARTWORK PANEL (Sesuai Referensi Gambar 2)
+    // ─────────────────────────────────────────────────────────────────────
+    private void BuildCentralManhwaFrame()
+    {
+        manhwaFrameGO = new GameObject("ManhwaArtFrame");
+        manhwaFrameGO.transform.SetParent(canvas.transform, false);
 
-        RectTransform pcRT = portraitContainer.AddComponent<RectTransform>();
-        pcRT.anchorMin = new Vector2(0f, 0.5f);
-        pcRT.anchorMax = new Vector2(0f, 0.5f);
-        pcRT.pivot     = new Vector2(0.5f, 0.5f);
-        pcRT.anchoredPosition = new Vector2(280f, 110f);
-        pcRT.sizeDelta = new Vector2(320f, 340f);
+        RectTransform mfRT = manhwaFrameGO.AddComponent<RectTransform>();
+        mfRT.anchorMin = new Vector2(0.5f, 0.5f);
+        mfRT.anchorMax = new Vector2(0.5f, 0.5f);
+        mfRT.pivot     = new Vector2(0.5f, 0.5f);
+        mfRT.sizeDelta = new Vector2(1120f, 580f);
+        mfRT.anchoredPosition = new Vector2(0f, 85f);
 
-        Image pcBg = portraitContainer.AddComponent<Image>();
-        if (modalPanelSprite != null) { pcBg.sprite = modalPanelSprite; pcBg.type = Image.Type.Sliced; }
-        pcBg.color = new Color(0.08f, 0.05f, 0.16f, 0.95f);
+        // Frame Background & Sliced Modal Border
+        Image frameBg = manhwaFrameGO.AddComponent<Image>();
+        if (modalPanelSprite != null) { frameBg.sprite = modalPanelSprite; frameBg.type = Image.Type.Sliced; }
+        frameBg.color = new Color(0.06f, 0.04f, 0.14f, 0.98f);
 
-        // Portrait Image
-        GameObject portImgGO = new GameObject("HeroPortrait");
-        portImgGO.transform.SetParent(portraitContainer.transform, false);
+        // Inner Mask for Manhwa Artwork
+        GameObject artMaskGO = new GameObject("ArtMask");
+        artMaskGO.transform.SetParent(manhwaFrameGO.transform, false);
+        RectTransform amRT = artMaskGO.AddComponent<RectTransform>();
+        amRT.anchorMin = Vector2.zero; amRT.anchorMax = Vector2.one;
+        amRT.offsetMin = new Vector2(14f, 14f); amRT.offsetMax = new Vector2(-14f, -14f);
 
-        heroPortraitRT = portImgGO.AddComponent<RectTransform>();
-        heroPortraitRT.anchorMin = new Vector2(0.5f, 0.5f);
-        heroPortraitRT.anchorMax = new Vector2(0.5f, 0.5f);
-        heroPortraitRT.pivot     = new Vector2(0.5f, 0.5f);
-        heroPortraitRT.anchoredPosition = new Vector2(0f, 20f);
-        heroPortraitRT.sizeDelta = new Vector2(220f, 220f);
+        artMaskGO.AddComponent<Mask>().showMaskGraphic = false;
+        artMaskGO.AddComponent<Image>().color = Color.white;
 
-        imgHeroPortrait = portImgGO.AddComponent<Image>();
-        Sprite chosenPortrait = (currentHeroName == "Valeria") ? portraitValeria : portraitKaelen;
-        imgHeroPortrait.sprite = chosenPortrait;
-        imgHeroPortrait.preserveAspect = true;
+        // Manhwa Illustration Image
+        GameObject artImgGO = new GameObject("ManhwaArtImage");
+        artImgGO.transform.SetParent(artMaskGO.transform, false);
+        RectTransform aiRT = artImgGO.AddComponent<RectTransform>();
+        aiRT.anchorMin = Vector2.zero; aiRT.anchorMax = Vector2.one;
+        aiRT.offsetMin = Vector2.zero; aiRT.offsetMax = Vector2.zero;
 
-        // Hero Title Badge
-        txtHeroTitleBadge = CreateTMP(portraitContainer.transform, "HeroTitleBadge", 14f, FontStyles.Bold,
-            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
-        txtHeroTitleBadge.rectTransform.anchorMin = new Vector2(0f, 0f);
-        txtHeroTitleBadge.rectTransform.anchorMax = new Vector2(1f, 0f);
-        txtHeroTitleBadge.rectTransform.pivot     = new Vector2(0.5f, 0f);
-        txtHeroTitleBadge.rectTransform.anchoredPosition = new Vector2(0f, 16f);
-        txtHeroTitleBadge.rectTransform.sizeDelta = new Vector2(-20f, 28f);
-        txtHeroTitleBadge.text = (currentHeroName == "Valeria")
-            ? "VALERIA  •  CRIMSON VALKYRIE"
-            : "KAELEN  •  THE SHADOW BLADER";
+        imgManhwaArt = artImgGO.AddComponent<Image>();
+        imgManhwaArt.sprite = artAshenvaleFall;
+        imgManhwaArt.preserveAspect = false; // Cover frame
+        imgManhwaArt.color = Color.white;
 
-        // ── MANHWA CHAPTER QUOTE HEADER (Kanan Atas) ──────────────────────
-        GameObject quoteGO = new GameObject("ChapterQuoteBox");
-        quoteGO.transform.SetParent(panelRoot.transform, false);
+        // Subtle dark gradient vignette over illustration
+        GameObject artVigGO = new GameObject("ArtInnerVignette");
+        artVigGO.transform.SetParent(artMaskGO.transform, false);
+        RectTransform avRT = artVigGO.AddComponent<RectTransform>();
+        avRT.anchorMin = Vector2.zero; avRT.anchorMax = Vector2.one;
+        avRT.offsetMin = Vector2.zero; avRT.offsetMax = Vector2.zero;
 
-        RectTransform qRT = quoteGO.AddComponent<RectTransform>();
-        qRT.anchorMin = new Vector2(0f, 0.5f);
-        qRT.anchorMax = new Vector2(1f, 0.5f);
-        qRT.pivot     = new Vector2(0.5f, 0.5f);
-        qRT.anchoredPosition = new Vector2(180f, 120f);
-        qRT.sizeDelta = new Vector2(-540f, 180f);
+        if (screenVignette != null)
+        {
+            Image avi = artVigGO.AddComponent<Image>();
+            avi.sprite = screenVignette;
+            avi.color = new Color(0f, 0f, 0f, 0.45f);
+            avi.raycastTarget = false;
+        }
 
-        txtChapterQuote = CreateTMP(quoteGO.transform, "TxtQuote", 22f, FontStyles.Italic,
-            new Color(1f, 0.92f, 0.70f, 1f), TextAlignmentOptions.Left);
-        txtChapterQuote.rectTransform.anchorMin = Vector2.zero;
-        txtChapterQuote.rectTransform.anchorMax = Vector2.one;
-        txtChapterQuote.rectTransform.offsetMin = Vector2.zero;
-        txtChapterQuote.rectTransform.offsetMax = Vector2.zero;
-        txtChapterQuote.lineSpacing = 14f;
+        // Onomatopoeia / SFX Floating Text (ala Manhwa Korea: 콰아아앙!)
+        GameObject sfxGO = new GameObject("ManhwaSFX");
+        sfxGO.transform.SetParent(manhwaFrameGO.transform, false);
+        RectTransform sfxRT = sfxGO.AddComponent<RectTransform>();
+        sfxRT.anchorMin = new Vector2(0f, 1f); sfxRT.anchorMax = new Vector2(0f, 1f);
+        sfxRT.pivot     = new Vector2(0f, 1f);
+        sfxRT.anchoredPosition = new Vector2(30f, -25f);
+        sfxRT.sizeDelta = new Vector2(480f, 60f);
 
-        // ── SPEAKER NAME BAND (Ala Webtoon Manhwa) ────────────────────────
-        GameObject speakerBand = new GameObject("SpeakerBand");
-        speakerBand.transform.SetParent(panelRoot.transform, false);
-        RectTransform sbRT = speakerBand.AddComponent<RectTransform>();
-        sbRT.anchorMin = new Vector2(0f, 0f);
-        sbRT.anchorMax = new Vector2(0f, 0f);
-        sbRT.pivot     = new Vector2(0f, 0f);
-        sbRT.sizeDelta = new Vector2(460f, 44f);
-        sbRT.anchoredPosition = new Vector2(60f, 340f);
+        txtManhwaSFX = sfxGO.AddComponent<TextMeshProUGUI>();
+        txtManhwaSFX.font = tmpFont;
+        txtManhwaSFX.fontSize = 28f;
+        txtManhwaSFX.fontStyle = FontStyles.Bold | FontStyles.Italic;
+        txtManhwaSFX.color = new Color(1.0f, 0.40f, 0.15f, 1f);
+        txtManhwaSFX.characterSpacing = 3f;
+        txtManhwaSFX.text = "《 콰아아앙! (KABOOM!) 》";
 
-        Image spImg = speakerBand.AddComponent<Image>();
-        spImg.color = new Color(0.80f, 0.60f, 0.20f, 0.95f);
-        if (modalPanelSprite != null) { spImg.sprite = modalPanelSprite; spImg.type = Image.Type.Sliced; }
+        // Chapter / Episode Tag Top-Right
+        GameObject tagGO = new GameObject("ChapterTag");
+        tagGO.transform.SetParent(manhwaFrameGO.transform, false);
+        RectTransform tagRT = tagGO.AddComponent<RectTransform>();
+        tagRT.anchorMin = new Vector2(1f, 1f); tagRT.anchorMax = new Vector2(1f, 1f);
+        tagRT.pivot     = new Vector2(1f, 1f);
+        tagRT.anchoredPosition = new Vector2(-30f, -25f);
+        tagRT.sizeDelta = new Vector2(400f, 32f);
 
-        txtSpeaker = CreateTMP(speakerBand.transform, "SpeakerName", 16f, FontStyles.Bold,
-            new Color(0.06f, 0.04f, 0.08f, 1f), TextAlignmentOptions.Left);
-        txtSpeaker.rectTransform.anchorMin = Vector2.zero;
-        txtSpeaker.rectTransform.anchorMax = Vector2.one;
-        txtSpeaker.rectTransform.offsetMin = new Vector2(20f, 0f);
-        txtSpeaker.rectTransform.offsetMax = new Vector2(-20f, 0f);
-        txtSpeaker.characterSpacing = 2f;
+        txtChapterTag = tagGO.AddComponent<TextMeshProUGUI>();
+        txtChapterTag.font = tmpFont;
+        txtChapterTag.fontSize = 14f;
+        txtChapterTag.fontStyle = FontStyles.Bold;
+        txtChapterTag.color = new Color(1f, 0.88f, 0.45f, 1f);
+        txtChapterTag.alignment = TextAlignmentOptions.Right;
+        txtChapterTag.characterSpacing = 2f;
+        txtChapterTag.text = "EPISODE 0 • HARI KEHANCURAN";
 
-        // ── MAIN NARRATIVE DIALOGUE BOX (Bagian Bawah Layar) ──────────────
-        GameObject textBox = new GameObject("NarrativeBox");
-        textBox.transform.SetParent(panelRoot.transform, false);
-        RectTransform tbRT = textBox.AddComponent<RectTransform>();
-        tbRT.anchorMin = new Vector2(0f, 0f);
-        tbRT.anchorMax = new Vector2(1f, 0f);
-        tbRT.pivot     = new Vector2(0.5f, 0f);
-        tbRT.sizeDelta = new Vector2(-120f, 250f);
-        tbRT.anchoredPosition = new Vector2(0f, 90f);
+        // 4 Corner Gold Diamonds
+        BuildFrameDiamonds(manhwaFrameGO.transform, 560f, 290f);
+    }
 
-        Image tbImg = textBox.AddComponent<Image>();
-        tbImg.color = new Color(0.05f, 0.03f, 0.12f, 0.96f);
-        if (modalPanelSprite != null) { tbImg.sprite = modalPanelSprite; tbImg.type = Image.Type.Sliced; }
+    // ─────────────────────────────────────────────────────────────────────
+    // CAPTION & DIALOGUE BOX (Menempel di Bawah Frame Ilustrasi)
+    // ─────────────────────────────────────────────────────────────────────
+    private void BuildCaptionDialogueBox()
+    {
+        captionBoxGO = new GameObject("CaptionDialogueBox");
+        captionBoxGO.transform.SetParent(canvas.transform, false);
 
-        CreateGoldLine(textBox.transform, 1f, 0f, false);
-        CreateGoldLine(textBox.transform, 0f, 0f, true);
+        RectTransform cbRT = captionBoxGO.AddComponent<RectTransform>();
+        cbRT.anchorMin = new Vector2(0.5f, 0.5f);
+        cbRT.anchorMax = new Vector2(0.5f, 0.5f);
+        cbRT.pivot     = new Vector2(0.5f, 0.5f);
+        cbRT.sizeDelta = new Vector2(1120f, 185f);
+        cbRT.anchoredPosition = new Vector2(0f, -245f);
 
-        txtNarrative = CreateTMP(textBox.transform, "NarrativeText", 21f, FontStyles.Normal,
-            new Color(1f, 0.95f, 0.88f, 1f), TextAlignmentOptions.Left);
-        txtNarrative.rectTransform.anchorMin = Vector2.zero;
-        txtNarrative.rectTransform.anchorMax = Vector2.one;
-        txtNarrative.rectTransform.offsetMin = new Vector2(40f, 24f);
-        txtNarrative.rectTransform.offsetMax = new Vector2(-40f, -24f);
-        txtNarrative.lineSpacing = 12f;
+        Image cbImg = captionBoxGO.AddComponent<Image>();
+        if (modalPanelSprite != null) { cbImg.sprite = modalPanelSprite; cbImg.type = Image.Type.Sliced; }
+        cbImg.color = new Color(0.06f, 0.04f, 0.12f, 0.98f);
 
-        // ── NEXT / CONTINUE BUTTON ────────────────────────────────────────
-        GameObject btnGO = new GameObject("BtnNext");
-        btnGO.transform.SetParent(panelRoot.transform, false);
-        RectTransform bRT = btnGO.AddComponent<RectTransform>();
-        bRT.anchorMin = new Vector2(1f, 0f);
-        bRT.anchorMax = new Vector2(1f, 0f);
-        bRT.pivot     = new Vector2(1f, 0f);
-        bRT.sizeDelta = new Vector2(320f, 54f);
-        bRT.anchoredPosition = new Vector2(-60f, 22f);
+        CreateGoldDivider(captionBoxGO.transform, 1f, 0f);
+        CreateGoldDivider(captionBoxGO.transform, 0f, 0f);
 
-        Image bImg = btnGO.AddComponent<Image>();
-        if (btnFantasyNormal != null) { bImg.sprite = btnFantasyNormal; bImg.type = Image.Type.Sliced; bImg.color = Color.white; }
-        else bImg.color = new Color(0.80f, 0.60f, 0.20f, 0.95f);
+        // Speaker Pill / Name Badge
+        GameObject pillGO = new GameObject("SpeakerPill");
+        pillGO.transform.SetParent(captionBoxGO.transform, false);
+        RectTransform pRT = pillGO.AddComponent<RectTransform>();
+        pRT.anchorMin = new Vector2(0f, 1f); pRT.anchorMax = new Vector2(0f, 1f);
+        pRT.pivot     = new Vector2(0f, 1f);
+        pRT.anchoredPosition = new Vector2(30f, -14f);
+        pRT.sizeDelta = new Vector2(320f, 34f);
 
-        btnNext = btnGO.AddComponent<Button>();
+        imgSpeakerPill = pillGO.AddComponent<Image>();
+        if (btnFantasyNormal != null) { imgSpeakerPill.sprite = btnFantasyNormal; imgSpeakerPill.type = Image.Type.Sliced; }
+        imgSpeakerPill.color = new Color(0.85f, 0.60f, 0.20f, 0.95f);
+
+        txtSpeakerBadge = CreateTMP(pillGO.transform, "TxtBadge", 14.5f, FontStyles.Bold,
+            new Color(0.06f, 0.04f, 0.08f, 1f), TextAlignmentOptions.Center);
+        txtSpeakerBadge.rectTransform.anchorMin = Vector2.zero; txtSpeakerBadge.rectTransform.anchorMax = Vector2.one;
+        txtSpeakerBadge.rectTransform.offsetMin = Vector2.zero; txtSpeakerBadge.rectTransform.offsetMax = Vector2.zero;
+        txtSpeakerBadge.characterSpacing = 2f;
+        txtSpeakerBadge.text = "[ KAELEN ]";
+
+        // Subtitle Context (Di samping speaker pill)
+        txtChapterSubtitle = CreateTMP(captionBoxGO.transform, "TxtSubtitle", 13.5f, FontStyles.Italic,
+            new Color(0.85f, 0.80f, 0.70f, 0.85f), TextAlignmentOptions.Left);
+        txtChapterSubtitle.rectTransform.anchorMin = new Vector2(0f, 1f); txtChapterSubtitle.rectTransform.anchorMax = new Vector2(1f, 1f);
+        txtChapterSubtitle.rectTransform.pivot     = new Vector2(0f, 1f);
+        txtChapterSubtitle.rectTransform.anchoredPosition = new Vector2(370f, -16f);
+        txtChapterSubtitle.rectTransform.sizeDelta = new Vector2(-400f, 30f);
+        txtChapterSubtitle.text = "10 Tahun Lalu — Di Balik Kabut Ashenvale";
+
+        // Narrative / Dialogue Body Text
+        GameObject bodyGO = new GameObject("NarrativeBody");
+        bodyGO.transform.SetParent(captionBoxGO.transform, false);
+        RectTransform bRT = bodyGO.AddComponent<RectTransform>();
+        bRT.anchorMin = Vector2.zero; bRT.anchorMax = Vector2.one;
+        bRT.offsetMin = new Vector2(32f, 16f);
+        bRT.offsetMax = new Vector2(-32f, -54f);
+
+        txtNarrativeDialogue = bodyGO.AddComponent<TextMeshProUGUI>();
+        txtNarrativeDialogue.font = tmpFont;
+        txtNarrativeDialogue.fontSize = 20.5f;
+        txtNarrativeDialogue.fontStyle = FontStyles.Normal;
+        txtNarrativeDialogue.color = new Color(1f, 0.95f, 0.90f, 1f);
+        txtNarrativeDialogue.alignment = TextAlignmentOptions.Left;
+        txtNarrativeDialogue.enableWordWrapping = true;
+        txtNarrativeDialogue.lineSpacing = 10f;
+        txtNarrativeDialogue.richText = true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // BOTTOM NAVIGATION CONTROLS
+    // ─────────────────────────────────────────────────────────────────────
+    private void BuildBottomNavBar()
+    {
+        GameObject navBar = new GameObject("BottomNavBar");
+        navBar.transform.SetParent(canvas.transform, false);
+
+        RectTransform nbRT = navBar.AddComponent<RectTransform>();
+        nbRT.anchorMin = new Vector2(0.5f, 0f); nbRT.anchorMax = new Vector2(0.5f, 0f);
+        nbRT.pivot     = new Vector2(0.5f, 0f);
+        nbRT.sizeDelta = new Vector2(1120f, 60f);
+        nbRT.anchoredPosition = new Vector2(0f, 25f);
+
+        // 1. Button PREV [ ◄ SEBELUMNYA ]
+        GameObject prevGO = new GameObject("BtnPrev");
+        prevGO.transform.SetParent(navBar.transform, false);
+        RectTransform pRT = prevGO.AddComponent<RectTransform>();
+        pRT.anchorMin = new Vector2(0f, 0.5f); pRT.anchorMax = new Vector2(0f, 0.5f);
+        pRT.pivot     = new Vector2(0f, 0.5f);
+        pRT.sizeDelta = new Vector2(210f, 48f);
+        pRT.anchoredPosition = new Vector2(0f, 0f);
+
+        Image pImg = prevGO.AddComponent<Image>();
+        if (btnFantasyNormal != null) { pImg.sprite = btnFantasyNormal; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.18f, 0.12f, 0.28f, 0.95f);
+
+        btnPrev = prevGO.AddComponent<Button>();
+        btnPrev.onClick.AddListener(OnPrevClicked);
+
+        TMP_Text pTxt = CreateTMP(prevGO.transform, "Lbl", 15f, FontStyles.Bold,
+            new Color(0.90f, 0.85f, 0.75f, 1f), TextAlignmentOptions.Center);
+        pTxt.rectTransform.anchorMin = Vector2.zero; pTxt.rectTransform.anchorMax = Vector2.one;
+        pTxt.rectTransform.offsetMin = Vector2.zero; pTxt.rectTransform.offsetMax = Vector2.zero;
+        pTxt.text = "[ ◄ SEBELUMNYA ]";
+
+        // 2. Button NEXT [ LANJUTKAN ► ]
+        GameObject nextGO = new GameObject("BtnNext");
+        nextGO.transform.SetParent(navBar.transform, false);
+        RectTransform nRT = nextGO.AddComponent<RectTransform>();
+        nRT.anchorMin = new Vector2(1f, 0.5f); nRT.anchorMax = new Vector2(1f, 0.5f);
+        nRT.pivot     = new Vector2(1f, 0.5f);
+        nRT.sizeDelta = new Vector2(340f, 52f);
+        nRT.anchoredPosition = new Vector2(0f, 0f);
+
+        Image nImg = nextGO.AddComponent<Image>();
+        if (btnFantasyNormal != null) { nImg.sprite = btnFantasyNormal; nImg.type = Image.Type.Sliced; }
+        nImg.color = Color.white;
+
+        btnNext = nextGO.AddComponent<Button>();
         btnNext.onClick.AddListener(OnNextClicked);
 
-        // Hover scale
-        var ev = btnGO.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-        var enterE = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter };
-        enterE.callback.AddListener(_ => btnGO.transform.localScale = new Vector3(1.04f, 1.04f, 1f));
-        ev.triggers.Add(enterE);
-        var exitE = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit };
-        exitE.callback.AddListener(_ => btnGO.transform.localScale = Vector3.one);
-        ev.triggers.Add(exitE);
-
-        btnNextLabel = CreateTMP(btnGO.transform, "BtnLabel", 18f, FontStyles.Bold,
+        txtBtnNextLabel = CreateTMP(nextGO.transform, "Lbl", 17f, FontStyles.Bold,
             new Color(1f, 0.92f, 0.65f, 1f), TextAlignmentOptions.Center);
-        btnNextLabel.rectTransform.anchorMin = Vector2.zero;
-        btnNextLabel.rectTransform.anchorMax = Vector2.one;
-        btnNextLabel.rectTransform.offsetMin = Vector2.zero;
-        btnNextLabel.rectTransform.offsetMax = Vector2.zero;
-        btnNextLabel.text = "▶  Lanjutkan [SPACE]";
+        txtBtnNextLabel.rectTransform.anchorMin = Vector2.zero; txtBtnNextLabel.rectTransform.anchorMax = Vector2.one;
+        txtBtnNextLabel.rectTransform.offsetMin = Vector2.zero; txtBtnNextLabel.rectTransform.offsetMax = Vector2.zero;
+        txtBtnNextLabel.characterSpacing = 2f;
+        txtBtnNextLabel.text = "▶  Lanjutkan [SPACE]";
+
+        // 3. Pagination Dots (Tengah)
+        BuildPaginationDots(navBar.transform);
+    }
+
+    private void BuildPaginationDots(Transform parent)
+    {
+        GameObject dotsGO = new GameObject("DotsContainer");
+        dotsGO.transform.SetParent(parent, false);
+        RectTransform dRT = dotsGO.AddComponent<RectTransform>();
+        dRT.anchorMin = new Vector2(0.5f, 0.5f); dRT.anchorMax = new Vector2(0.5f, 0.5f);
+        dRT.pivot     = new Vector2(0.5f, 0.5f);
+        dRT.sizeDelta = new Vector2(180f, 30f);
+        dRT.anchoredPosition = Vector2.zero;
+
+        int count = beats.Count;
+        pageDotImgs = new Image[count];
+        float spacing = 28f;
+        float startX = -(spacing * (count - 1)) / 2f;
+
+        for (int i = 0; i < count; i++)
+        {
+            GameObject dot = new GameObject("Dot_" + i);
+            dot.transform.SetParent(dotsGO.transform, false);
+            RectTransform drt = dot.AddComponent<RectTransform>();
+            drt.anchorMin = new Vector2(0.5f, 0.5f); drt.anchorMax = new Vector2(0.5f, 0.5f);
+            drt.pivot     = new Vector2(0.5f, 0.5f);
+            drt.sizeDelta = new Vector2(14f, 14f);
+            drt.anchoredPosition = new Vector2(startX + i * spacing, 0f);
+
+            Image di = dot.AddComponent<Image>();
+            pageDotImgs[i] = di;
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // SHOW PANEL & ANIMASI
+    // SHOW BEAT & ANIMASI
     // ─────────────────────────────────────────────────────────────────────
-    private IEnumerator FadeInThenShowPanel(int idx)
+    private void ShowBeat(int idx, bool playPageSound = true)
     {
-        float elapsed = 0f;
-        while (elapsed < 0.6f)
+        if (idx < 0 || idx >= beats.Count) return;
+
+        currentBeatIndex = idx;
+        StoryBeat beat = beats[idx];
+
+        if (playPageSound) PlayPageSfx();
+
+        // 1. Manhwa Artwork
+        if (imgManhwaArt != null && beat.artSprite != null)
         {
-            elapsed += Time.deltaTime;
-            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(1f, 0f, elapsed / 0.6f));
-            yield return null;
-        }
-        fadeOverlay.color = new Color(0f, 0f, 0f, 0f);
-        fadeOverlay.raycastTarget = false;
-
-        ShowPanel(idx);
-    }
-
-    private void ShowPanel(int idx)
-    {
-        if (idx < 0 || idx >= panels.Count) return;
-
-        currentPanel = idx;
-        StoryPanel p = panels[idx];
-
-        imgBackground.color = p.bgColor;
-        if (leftVignette != null) leftVignette.color = p.vignetteColor;
-
-        // Speaker band
-        txtSpeaker.text = p.speaker;
-        Image spBandImg = txtSpeaker.transform.parent.GetComponent<Image>();
-        if (spBandImg != null) spBandImg.color = GetMoodBandColor(p.mood);
-
-        // Chapter quote header
-        if (txtChapterQuote != null)
-        {
-            txtChapterQuote.text = p.chapterQuote;
-            txtChapterQuote.color = GetMoodQuoteColor(p.mood);
+            imgManhwaArt.sprite = beat.artSprite;
         }
 
-        // Page number
-        txtPageNum.text = $"Halaman {idx + 1} / {panels.Count}";
+        // 2. Onomatopoeia & Chapter Tag
+        if (txtManhwaSFX != null)
+        {
+            txtManhwaSFX.text  = beat.onomatopoeia;
+            txtManhwaSFX.color = beat.sfxColor;
+        }
+        if (txtChapterTag != null)
+        {
+            txtChapterTag.text  = beat.chapterTag;
+            txtChapterTag.color = beat.moodColor;
+        }
 
-        // Button label
-        btnNextLabel.text = p.btnLabel;
-        txtNarrative.color = p.textColor;
+        // 3. Speaker Badge & Subtitle
+        if (txtSpeakerBadge != null)
+        {
+            txtSpeakerBadge.text = $"[ {beat.speaker} ]";
+            imgSpeakerPill.color = beat.moodColor;
+        }
+        if (txtChapterSubtitle != null)
+        {
+            txtChapterSubtitle.text = beat.subtitle;
+        }
 
-        // Typewriter effect
+        // 4. Button Next Label & Prev State
+        if (txtBtnNextLabel != null) txtBtnNextLabel.text = beat.nextBtnLabel;
+        if (btnPrev != null) btnPrev.gameObject.SetActive(idx > 0);
+
+        // 5. Page Counter & Dots
+        if (txtPageCounter != null) txtPageCounter.text = $"Halaman {idx + 1} / {beats.Count}";
+        UpdateDots(idx);
+
+        // 6. Typewriter Effect
         if (typingCoroutine != null) StopCoroutine(typingCoroutine);
-        typingCoroutine = StartCoroutine(TypewriterEffect(p.text, 0.024f));
+        typingCoroutine = StartCoroutine(TypewriterRoutine(beat.text, 0.020f));
     }
 
-    private Color GetMoodBandColor(string mood)
+    private void UpdateDots(int activeIdx)
     {
-        switch (mood)
+        if (pageDotImgs == null) return;
+        for (int i = 0; i < pageDotImgs.Length; i++)
         {
-            case "sad":     return new Color(0.40f, 0.15f, 0.45f, 0.95f); // Ungu Kelam
-            case "rage":    return new Color(0.75f, 0.15f, 0.10f, 0.95f); // Merah Membara
-            case "resolve": return new Color(0.15f, 0.45f, 0.85f, 0.95f); // Biru Ksatria
-            default:        return new Color(0.85f, 0.65f, 0.20f, 0.95f); // Emas
+            if (pageDotImgs[i] == null) continue;
+            bool isActive = (i == activeIdx);
+            pageDotImgs[i].color = isActive
+                ? new Color(1f, 0.85f, 0.35f, 1f)
+                : new Color(0.35f, 0.30f, 0.45f, 0.65f);
+            pageDotImgs[i].transform.localScale = isActive ? new Vector3(1.3f, 1.3f, 1f) : Vector3.one;
         }
     }
 
-    private Color GetMoodQuoteColor(string mood)
-    {
-        switch (mood)
-        {
-            case "sad":     return new Color(0.85f, 0.70f, 0.95f, 0.90f);
-            case "rage":    return new Color(1.00f, 0.50f, 0.40f, 0.95f);
-            case "resolve": return new Color(0.60f, 0.90f, 1.00f, 0.95f);
-            default:        return new Color(1.00f, 0.90f, 0.70f, 0.90f);
-        }
-    }
-
-    private IEnumerator TypewriterEffect(string fullText, float charDelay)
+    private IEnumerator TypewriterRoutine(string fullText, float charDelay)
     {
         isTyping = true;
-        txtNarrative.text = "";
+        txtNarrativeDialogue.text = "";
 
         for (int i = 0; i < fullText.Length; i++)
         {
@@ -614,113 +750,115 @@ public class StoryScene : MonoBehaviour
                 if (close > i)
                 {
                     i = close;
-                    txtNarrative.text = fullText.Substring(0, i + 1);
+                    txtNarrativeDialogue.text = fullText.Substring(0, i + 1);
                     continue;
                 }
             }
 
-            txtNarrative.text = fullText.Substring(0, i + 1);
+            txtNarrativeDialogue.text = fullText.Substring(0, i + 1);
             yield return new WaitForSeconds(charDelay);
         }
 
-        txtNarrative.text = fullText;
+        txtNarrativeDialogue.text = fullText;
         isTyping = false;
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // TOMBOL NEXT & NAVIGASI
+    // NAVIGASI TOMBOL
     // ─────────────────────────────────────────────────────────────────────
     private void OnNextClicked()
     {
         if (isTransitioning) return;
 
-        PlayClick();
+        PlayClickSfx();
 
         if (isTyping)
         {
             if (typingCoroutine != null) StopCoroutine(typingCoroutine);
             isTyping = false;
-            txtNarrative.text = panels[currentPanel].text;
+            txtNarrativeDialogue.text = beats[currentBeatIndex].text;
             return;
         }
 
-        int next = currentPanel + 1;
-        if (next >= panels.Count)
+        int next = currentBeatIndex + 1;
+        if (next >= beats.Count)
         {
-            StartCoroutine(FadeAndLoadStage1());
+            StartCoroutine(FinishStoryAndProceed());
         }
         else
         {
-            StartCoroutine(PanelTransition(next));
+            StartCoroutine(TransitionToBeat(next));
         }
     }
 
-    private void OnSkipAll()
+    private void OnPrevClicked()
+    {
+        if (isTransitioning || currentBeatIndex <= 0) return;
+        PlayClickSfx();
+        if (typingCoroutine != null) StopCoroutine(typingCoroutine);
+        StartCoroutine(TransitionToBeat(currentBeatIndex - 1));
+    }
+
+    private void OnSkipAllClicked()
     {
         if (isTransitioning) return;
-        PlayClick();
-        StartCoroutine(FadeAndLoadStage1());
+        PlayClickSfx();
+        StartCoroutine(FinishStoryAndProceed());
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.RightArrow))
         {
             OnNextClicked();
         }
+        else if (Input.GetKeyDown(KeyCode.LeftArrow) && currentBeatIndex > 0)
+        {
+            OnPrevClicked();
+        }
         else if (Input.GetKeyDown(KeyCode.Escape))
         {
-            OnSkipAll();
-        }
-
-        // Gentle breathing animation pada portrait
-        if (heroPortraitRT != null)
-        {
-            float bob = Mathf.Sin(Time.time * 2f) * 4f;
-            heroPortraitRT.anchoredPosition = new Vector2(0f, 20f + bob);
+            OnSkipAllClicked();
         }
     }
 
-    private IEnumerator PanelTransition(int nextIdx)
+    private IEnumerator TransitionToBeat(int targetIdx)
     {
         isTransitioning = true;
         fadeOverlay.raycastTarget = true;
 
         float elapsed = 0f;
-        while (elapsed < 0.22f)
+        while (elapsed < 0.20f)
         {
             elapsed += Time.deltaTime;
-            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, 1f, elapsed / 0.22f));
+            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, 0.85f, elapsed / 0.20f));
             yield return null;
         }
-        fadeOverlay.color = Color.black;
 
-        PlayPageSfx();
-        ShowPanel(nextIdx);
+        ShowBeat(targetIdx, true);
 
         elapsed = 0f;
-        while (elapsed < 0.28f)
+        while (elapsed < 0.25f)
         {
             elapsed += Time.deltaTime;
-            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(1f, 0f, elapsed / 0.28f));
+            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.85f, 0f, elapsed / 0.25f));
             yield return null;
         }
         fadeOverlay.color = new Color(0f, 0f, 0f, 0f);
         fadeOverlay.raycastTarget = false;
-
         isTransitioning = false;
     }
 
-    private IEnumerator FadeAndLoadStage1()
+    private IEnumerator FinishStoryAndProceed()
     {
         isTransitioning = true;
         fadeOverlay.raycastTarget = true;
 
         float elapsed = 0f;
-        while (elapsed < 0.65f)
+        while (elapsed < 0.60f)
         {
             elapsed += Time.deltaTime;
-            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, 1f, elapsed / 0.65f));
+            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, 1f, elapsed / 0.60f));
             yield return null;
         }
         fadeOverlay.color = Color.black;
@@ -735,7 +873,7 @@ public class StoryScene : MonoBehaviour
     // HELPERS
     // ─────────────────────────────────────────────────────────────────────
     private TMP_Text CreateTMP(Transform parent, string name, float size, FontStyles style,
-                               Color color, TextAlignmentOptions align)
+                              Color color, TextAlignmentOptions align)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -751,28 +889,51 @@ public class StoryScene : MonoBehaviour
         return t;
     }
 
-    private void CreateGoldLine(Transform parent, float anchorY, float posY, bool bottom)
+    private void CreateGoldDivider(Transform parent, float anchorY, float posY)
     {
-        GameObject go = new GameObject("GoldLine");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.AddComponent<RectTransform>();
+        GameObject line = new GameObject("GoldDivider");
+        line.transform.SetParent(parent, false);
+        RectTransform rt = line.AddComponent<RectTransform>();
         rt.anchorMin = new Vector2(0f, anchorY);
         rt.anchorMax = new Vector2(1f, anchorY);
-        rt.pivot     = new Vector2(0.5f, bottom ? 0f : 1f);
+        rt.pivot     = new Vector2(0.5f, anchorY);
         rt.sizeDelta = new Vector2(0f, 2.5f);
         rt.anchoredPosition = new Vector2(0f, posY);
-        go.AddComponent<Image>().color = new Color(0.98f, 0.78f, 0.30f, 0.80f);
+        goImage(line, new Color(0.98f, 0.78f, 0.30f, 0.85f));
     }
 
-    private void PlayClick()
+    private void BuildFrameDiamonds(Transform parent, float w, float h)
     {
-        if (sfxClick != null && audioSource != null)
-            audioSource.PlayOneShot(sfxClick);
+        float[] dx = { -w,  w, -w,  w };
+        float[] dy = {  h,  h, -h, -h };
+        for (int i = 0; i < 4; i++)
+        {
+            GameObject dia = new GameObject("Diamond_" + i);
+            dia.transform.SetParent(parent, false);
+            RectTransform drt = dia.AddComponent<RectTransform>();
+            drt.anchorMin = new Vector2(0.5f, 0.5f); drt.anchorMax = new Vector2(0.5f, 0.5f);
+            drt.pivot     = new Vector2(0.5f, 0.5f);
+            drt.sizeDelta = new Vector2(16f, 16f);
+            drt.anchoredPosition = new Vector2(dx[i], dy[i]);
+            drt.localEulerAngles = new Vector3(0f, 0f, 45f);
+            goImage(dia, new Color(0.98f, 0.80f, 0.30f, 0.90f));
+        }
+    }
+
+    private Image goImage(GameObject go, Color color)
+    {
+        Image img = go.AddComponent<Image>();
+        img.color = color;
+        return img;
+    }
+
+    private void PlayClickSfx()
+    {
+        if (sfxClick != null && audioSource != null) audioSource.PlayOneShot(sfxClick);
     }
 
     private void PlayPageSfx()
     {
-        if (sfxPage != null && audioSource != null)
-            audioSource.PlayOneShot(sfxPage, 0.6f);
+        if (sfxPage != null && audioSource != null) audioSource.PlayOneShot(sfxPage, 0.6f);
     }
 }
