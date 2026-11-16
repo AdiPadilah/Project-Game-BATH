@@ -6,12 +6,12 @@ using System.Collections.Generic;
 /// <summary>
 /// BossAI — King Demon Slime
 ///
-/// SKILL 1 : Lava Dash      — Boss melesat kencang ke arah player + jejak lava di lantai
-/// SKILL 2 : Twin Slash    — 2x ayunan tebasan cakar/pedang + letusan lava di tanah bawah player
-/// SKILL 3 : Cyclone Sweep — Seperti Skill 2 BALMOND (Mobile Legends):
-///            - Badan bos AKTIF BERPUTAR (flip cepat kiri-kanan = ilusi 360 derajat)
-///            - Badan bos IKUT JALAN mengejar player sambil muter
-///            - Efek lava berputar horizontal PAS melingkari badan bos (tidak kebesaran)
+/// SKILL 1 : Lava Dash        — Boss melesat kencang ke arah player + jejak lava di lantai
+/// SKILL 2 : Twin Slash      — 2x ayunan tebasan cakar/pedang + letusan lava di tanah bawah player
+/// SKILL 3 : Berserker Storm — Kombo Badai Ayunan Pedang Beruntun (HP <= 50% ONLY):
+///            - Gerakan badan, ayunan pedang raksasa, dan efek lava 100% SINKRON & REALISTIS!
+///            - Bos mengayunkan pedang raksasa berputar 4x bertubi-tubi sambil lunge maju mengejar player
+///            - Efek sabetan lava pas di ujung bilah pedang (proporsional, tidak kebesaran)
 ///            - HANYA aktif saat darah bos di bawah 50% (HP <= 50%)
 /// </summary>
 public class BossAI : Entity
@@ -39,13 +39,12 @@ public class BossAI : Entity
     public int   skill2LavaDmg   = 25;
     public float skill2Range     = 3.0f;
 
-    // ─── Skill 3: Balmond Cyclone Sweep (HP <= 50% only) ──────────────────────
-    [Header("Skill 3 - Balmond Cyclone Sweep [HP <= 50% ONLY]")]
+    // ─── Skill 3: Berserker Storm (HP <= 50% only) ────────────────────────────
+    [Header("Skill 3 - Berserker Storm Combo [HP <= 50% ONLY]")]
     public float skill3Cooldown   = 12.0f;
-    public int   skill3SpinDmg    = 14;     // Damage per tick saat memutar
-    public float skill3Duration   = 3.2f;   // Durasi putaran
-    public float skill3Radius     = 2.4f;   // Jangkauan pedang memutar (pas di badan & tebasan)
-    public float skill3ChaseSpeed = 6.5f;   // Kecepatan bos berjalan sambil muter (Balmond style)
+    public int   skill3SpinDmg    = 18;     // Damage per ayunan tebasan
+    public float skill3Radius     = 2.8f;   // Jangkauan pedang pas di ujung bilah
+    public float skill3LungeSpeed = 6.0f;   // Kecepatan dorongan lunge maju saat menebas
     private bool skill3Unlocked   = false;
 
     // ─── Layer ────────────────────────────────────────────────────────────────
@@ -211,10 +210,10 @@ public class BossAI : Entity
         bool  close = hDist <= skill2Range && vDist <= 3.5f;
 
         // Prioritas Skill:
-        // 1. Skill 3 (Balmond Cyclone) jika unlock & siap
+        // 1. Skill 3 (Berserker Storm Combo) jika unlock & siap
         if (skill3Unlocked && skill3Timer <= 0f && hDist <= 12f)
         {
-            StartCoroutine(BalmondCycloneRoutine());
+            StartCoroutine(BerserkerStormRoutine());
             return;
         }
 
@@ -434,184 +433,126 @@ public class BossAI : Entity
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // SKILL 3 — BALMOND-STYLE CYCLONE SWEEP (HANYA SAAT HP <= 50%)
-    // - Badan bos AKTIF BERPUTAR (flip cepat kiri-kanan = ilusi putaran 360 derajat)
-    // - Badan bos IKUT JALAN/LARI mengejar player (Balmond Skill 2)
-    // - Efek lava berputar horizontal PAS di sekitar pinggang (TIDAK RAKSASA)
+    // SKILL 3 — BERSERKER STORM COMBO (HANYA SAAT HP <= 50%)
+    // - Gerakan badan, pedang raksasa, dan efek lava 100% SINKRON!
+    // - Bos mengayunkan pedang raksasa berputar 4x berturut-turut sambil maju
+    // - Efek sabetan lava pas di ujung bilah pedang (proporsional, tidak kebesaran)
     // ═════════════════════════════════════════════════════════════════════════
-    private IEnumerator BalmondCycloneRoutine()
+    private IEnumerator BerserkerStormRoutine()
     {
         isAttacking = true;
         skill3Timer = skill3Cooldown;
         rb.velocity = Vector2.zero;
 
-        // Ancang-ancang: Roar singkat + getaran merah membara
+        // 1. Ancang-ancang: Roar menggelegar + aura merah menyala
         if (roarSound != null && audioSource != null)
-            audioSource.PlayOneShot(roarSound, 1.15f);
+            audioSource.PlayOneShot(roarSound, 1.2f);
 
         if (anim != null) anim.SetTrigger("Roar");
 
-        yield return StartCoroutine(ColorPulse(new Color(1.6f, 0.25f, 0.0f, 1f), 0.30f));
+        yield return StartCoroutine(ColorPulse(new Color(1.8f, 0.25f, 0.0f, 1f), 0.35f));
 
         if (player == null || isDead) { isAttacking = false; yield break; }
 
-        // Spawn Cyclone Horizontal yang PAS di sekitar pinggang bos (tidak kebesaran!)
-        GameObject cycloneGO = new GameObject("Boss_LavaCyclone_FX");
-        cycloneGO.transform.position = transform.position + new Vector3(0f, 0.15f, 0f);
-        SpriteRenderer cycloneSR = cycloneGO.AddComponent<SpriteRenderer>();
-        cycloneSR.sprite = fxHorizontalCyclone != null ? fxHorizontalCyclone : fxWhirlwind;
-        cycloneSR.color = new Color(1f, 0.6f, 0.15f, 0.95f);
-        cycloneSR.sortingOrder = 55;
+        // Percepat animasi Cleave (1.7x) agar ayunan cepat, bertenaga, dan agresif
+        if (anim != null) anim.speed = 1.7f;
 
-        Material cycloneMat = new Material(Shader.Find("Sprites/Default"));
-        cycloneMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        cycloneMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
-        cycloneSR.material = cycloneMat;
-
-        // Skala pas melingkari badan bos: lebar ~3.5 unit, tinggi ~1.0 unit (bukan 40 unit!)
-        Vector3 cycloneBaseScale = new Vector3(0.44f, 0.38f, 1f);
-        cycloneGO.transform.localScale = cycloneBaseScale;
-
-        float elapsed          = 0f;
-        float spinFlipTimer    = 0f;
-        float spinFlipInterval = 0.09f; // Frekuensi putaran badan bos
-        float damageTickTimer  = 0f;
-        float damageTickCd     = 0.25f;
-        float slashFxTimer     = 0f;
-        float slashFxCd        = 0.14f;
-        float afterimageTimer  = 0f;
-
-        bool spinFaceRight = (transform.localScale.x < 0);
+        int comboCount = 4;
+        float swingDuration = 1.25f / 1.7f; // ~0.73 detik per ayunan penuh
         float baseScale = Mathf.Clamp(bossScale, 1.5f, 2.0f);
 
-        if (anim != null) anim.SetTrigger("Cleave");
-
-        while (elapsed < skill3Duration)
+        for (int i = 0; i < comboCount; i++)
         {
             if (isDead) break;
 
-            elapsed         += Time.deltaTime;
-            spinFlipTimer   += Time.deltaTime;
-            damageTickTimer += Time.deltaTime;
-            slashFxTimer    += Time.deltaTime;
-            afterimageTimer += Time.deltaTime;
+            // Arah menuju player
+            float dirToPlayer = player != null ? Mathf.Sign(player.position.x - transform.position.x) : 1f;
 
-            // 1. BADAN BOS IKUT JALAN MENGEJAR PLAYER (Balmond skill 2)
-            if (player != null)
+            // Bergantian ayunan dua arah untuk efek sabetan badai berputar
+            bool swingRight = (i % 2 == 0) ? (dirToPlayer > 0) : (dirToPlayer < 0);
+            float faceSign = swingRight ? -1f : 1f; // -s adalah hadap kanan di BATH
+            transform.localScale = new Vector3(faceSign * baseScale, baseScale, 1f);
+
+            // Putar animasi Cleave langsung dari frame 0
+            if (anim != null)
+                anim.Play("BosCleave", 0, 0f);
+
+            // Gerak maju bertenaga (lunge) ke arah player saat mengayun
+            rb.velocity = new Vector2(dirToPlayer * skill3LungeSpeed, rb.velocity.y);
+
+            // Afterimage api di lintasan langkah
+            SpawnAfterimage(new Color(1f, 0.3f, 0.0f, 0.6f));
+
+            // Tunggu hingga frame tebasan mencapai puncaknya (0.35 detik)
+            yield return new WaitForSeconds(0.35f);
+
+            if (isDead) break;
+
+            // KETIKA PEDANG MENEBAS: Efek tebasan lava muncul PAS di ujung pedang!
+            float swingDir = swingRight ? 1f : -1f;
+            Vector3 slashPos = transform.position + new Vector3(swingDir * 1.4f, 0.25f, 0f);
+
+            // Sabetan lava horizontal proporsional (panjang ~2.8 unit, tinggi ~0.9 unit)
+            SpawnFX(slashPos,
+                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
+                    new Vector3(swingDir * 0.48f, 0.38f, 1f),
+                    Random.Range(-5f, 5f),
+                    0.22f,
+                    new Color(1f, 0.75f, 0.2f, 1f));
+
+            SpawnFX(slashPos * 0.9f, fxSlashCross, Vector3.one * 0.9f, 0f, 0.20f, Color.white);
+
+            if (attackSound != null && audioSource != null)
+                audioSource.PlayOneShot(attackSound, 1.15f);
+
+            if (CameraFollow.instance != null)
+                CameraFollow.instance.TriggerScreenShake(0.18f, 0.16f);
+
+            // Kolam lava kecil di tanah di bawah jalur sabetan
+            Vector3 groundLavaPos = new Vector3(slashPos.x, transform.position.y - 0.55f, 0f);
+            SpawnFX(groundLavaPos, fxLavaPool, new Vector3(1.1f, 0.6f, 1f), 0f, 0.8f,
+                    new Color(1f, 0.3f, 0.0f, 0.80f), true, 1.05f);
+
+            // Damage tebasan
+            Collider2D[] hits = Physics2D.OverlapCircleAll(slashPos, skill3Radius, playerLayer);
+            foreach (var h in hits)
             {
-                float chaseDir = Mathf.Sign(player.position.x - transform.position.x);
-                float distToPlayer = Mathf.Abs(player.position.x - transform.position.x);
-
-                float spd = (distToPlayer > 0.8f) ? skill3ChaseSpeed : (skill3ChaseSpeed * 0.4f);
-                rb.velocity = new Vector2(chaseDir * spd, rb.velocity.y);
-            }
-
-            // 2. BADAN BOS AKTIF BERPUTAR! (Flip cepat kiri <-> kanan tiap 0.09 detik)
-            if (spinFlipTimer >= spinFlipInterval)
-            {
-                spinFlipTimer = 0f;
-                spinFaceRight = !spinFaceRight;
-
-                // Flip arah badan bos sehingga tampak berputar 360 derajat
-                transform.localScale = new Vector3(spinFaceRight ? -baseScale : baseScale, baseScale, 1f);
-            }
-
-            // Efek cyclone horizontal menempel di pinggang bos
-            if (cycloneGO != null)
-            {
-                cycloneGO.transform.position = transform.position + new Vector3(0f, 0.15f, 0f);
-                float pulse = 1f + Mathf.Sin(elapsed * 20f) * 0.06f;
-                cycloneGO.transform.localScale = new Vector3(cycloneBaseScale.x * pulse, cycloneBaseScale.y * pulse, 1f);
-            }
-
-            // Tebasan pedang horizontal menyabet di sekitar pinggang bos
-            if (slashFxTimer >= slashFxCd)
-            {
-                slashFxTimer = 0f;
-                float side = spinFaceRight ? 1f : -1f;
-
-                Vector3 slashPos = transform.position + new Vector3(side * 0.4f, 0.15f, 0f);
-                SpawnFX(slashPos,
-                        fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
-                        new Vector3(side * 0.48f, 0.40f, 1f),
-                        Random.Range(-5f, 5f),
-                        0.18f,
-                        new Color(1f, 0.7f, 0.2f, 0.95f));
-
-                if (attackSound != null && audioSource != null && Random.value < 0.5f)
-                    audioSource.PlayOneShot(attackSound, 0.65f);
-
-                // Percikan lava kecil ke samping
-                Vector3 sparkPos = transform.position + new Vector3(side * 1.5f, -0.2f, 0f);
-                SpawnFX(sparkPos, fxLavaSplash,
-                        new Vector3(Random.Range(0.4f, 0.7f), Random.Range(0.5f, 0.8f), 1f),
-                        side * 25f, 0.28f,
-                        new Color(1f, 0.4f, 0.0f, 0.85f));
-            }
-
-            // Afterimage bayangan merah-oranye
-            if (afterimageTimer >= 0.08f)
-            {
-                afterimageTimer = 0f;
-                SpawnAfterimage(new Color(1f, 0.25f, 0.0f, 0.55f));
-            }
-
-            // 3. DAMAGE MULTI-HIT (tiap 0.25s)
-            if (damageTickTimer >= damageTickCd)
-            {
-                damageTickTimer = 0f;
-
-                Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, skill3Radius, playerLayer);
-                foreach (var h in hits)
+                Entity ent = h.GetComponent<Entity>();
+                if (ent != null)
                 {
-                    Entity ent = h.GetComponent<Entity>();
-                    if (ent != null)
-                    {
-                        ent.TakeDamage(skill3SpinDmg, false);
-                        SpawnFX(ent.transform.position, fxSlashCross,
-                                Vector3.one * 0.85f, Random.Range(-25f, 25f),
-                                0.18f, Color.white);
-                    }
+                    ent.TakeDamage(skill3SpinDmg, false);
                 }
-
-                if (CameraFollow.instance != null && hits.Length > 0)
-                    CameraFollow.instance.TriggerScreenShake(0.12f, 0.12f);
             }
 
-            yield return null;
+            yield return new WaitForSeconds(Mathf.Max(0.05f, swingDuration - 0.35f));
         }
 
-        if (cycloneGO != null) Destroy(cycloneGO);
-
+        // Kembalikan kecepatan animasi ke normal
+        if (anim != null) anim.speed = 1.0f;
         rb.velocity = Vector2.zero;
-        if (anim != null) anim.SetBool("isMoving", false);
 
-        // FINISHER PUTARAN (Tebasan penutup setelah putaran selesai)
+        // FINISHER SLAM: Tebasan ledakan penutup
         if (!isDead)
         {
             if (attackSound != null && audioSource != null)
-                audioSource.PlayOneShot(attackSound, 1.2f);
+                audioSource.PlayOneShot(attackSound, 1.4f);
 
             if (CameraFollow.instance != null)
-                CameraFollow.instance.TriggerScreenShake(0.40f, 0.32f);
+                CameraFollow.instance.TriggerScreenShake(0.45f, 0.35f);
 
-            // Tebasan penutup horizontal ganda
-            SpawnFX(transform.position + new Vector3(0f, 0.15f, 0f),
-                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
-                    new Vector3(0.60f, 0.45f, 1f), 0f, 0.30f,
-                    new Color(1f, 0.9f, 0.3f, 1f));
-            SpawnFX(transform.position + new Vector3(0f, 0.15f, 0f),
-                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
-                    new Vector3(-0.60f, 0.45f, 1f), 0f, 0.30f,
-                    new Color(1f, 0.9f, 0.3f, 1f));
+            Vector3 groundCenter = new Vector3(transform.position.x, transform.position.y - 0.55f, 0f);
+            SpawnFX(groundCenter, fxLavaPool, new Vector3(2.5f, 1.0f, 1f), 0f, 1.8f,
+                    new Color(1f, 0.25f, 0.0f, 0.90f), true, 1.1f);
 
-            // Kolam lava kecil di tanah
-            Vector3 groundPos = new Vector3(transform.position.x, transform.position.y - 0.55f, 0f);
-            SpawnFX(groundPos, fxLavaPool, new Vector3(1.8f, 0.8f, 1f), 0f, 1.5f,
-                    new Color(1f, 0.25f, 0.0f, 0.85f), true, 1.08f);
+            for (int k = -1; k <= 1; k += 2)
+            {
+                SpawnFX(transform.position + new Vector3(k * 1.5f, 0.2f, 0f),
+                        fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
+                        new Vector3(k * 0.55f, 0.42f, 1f), 0f, 0.30f,
+                        new Color(1f, 0.85f, 0.25f, 1f));
+            }
 
-            // Damage akhir + knockback
-            Collider2D[] finalHits = Physics2D.OverlapCircleAll(transform.position, skill3Radius, playerLayer);
+            Collider2D[] finalHits = Physics2D.OverlapCircleAll(transform.position, skill3Radius + 0.8f, playerLayer);
             foreach (var h in finalHits)
             {
                 Entity ent = h.GetComponent<Entity>();
@@ -620,8 +561,7 @@ public class BossAI : Entity
         }
 
         FlipToPlayer();
-
-        yield return new WaitForSeconds(0.3f);
+        yield return new WaitForSeconds(0.35f);
         isAttacking = false;
     }
 
@@ -660,7 +600,7 @@ public class BossAI : Entity
         {
             isTakingDamage = true;
             isAttacking    = false;
-            if (anim != null) anim.SetTrigger("Hit");
+            if (anim != null) { anim.speed = 1.0f; anim.SetTrigger("Hit"); }
             StartCoroutine(HitRoutine());
         }
         else
@@ -697,6 +637,7 @@ public class BossAI : Entity
         if (isDead) return;
         isDead = true;
         StopAllCoroutines();
+        if (anim != null) anim.speed = 1.0f;
         transform.rotation = Quaternion.identity;
         Time.timeScale  = 1.0f;
         isAttacking     = false;
@@ -794,13 +735,13 @@ public class BossAI : Entity
         if (frozenOnGameOver) return;
         frozenOnGameOver = true;
         StopAllCoroutines();
+        if (anim != null) { anim.speed = 1.0f; anim.enabled = false; }
         transform.rotation = Quaternion.identity;
         Time.timeScale = 1.0f;
         isAttacking = false;
         isKnocked   = false;
         canMove     = false;
         if (rb   != null) { rb.velocity = Vector2.zero; rb.simulated = false; }
-        if (anim != null) anim.enabled = false;
         enabled = false;
     }
 
