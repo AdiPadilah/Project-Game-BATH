@@ -186,7 +186,7 @@ public class StageObjectiveOverlay : MonoBehaviour
         string briefingTitle    = isGamePlay ? "THE AWAKENING" : stageName;
         string narrativeText    = isGamePlay
             ? "\"Ini hanya awal... kekuatan sejati tersimpan di balik kegelapan yang lebih dalam.\"\n— Suara misterius dari balik kabut"
-            : "Seorang pedagang telah ditawan oleh pasukan monster di reruntuhan kuno. Ia memegang petunjuk lokasi seseorang yang sangat berarti bagimu. Jangan biarkan nyawanya berakhir di sana.";
+            : "Seorang gadis penyintas bernama <color=#FFD6A5>Lyra</color> telah dikurung di dalam sel besi untuk dijadikan tumbal persembahan Raja Iblis. Bantai semua iblis penjaga dan selamatkan dia sebelum ritual pengorbanan selesai!";
 
         string[] objectivesList = isGamePlay
             ? new string[] {
@@ -195,9 +195,9 @@ public class StageObjectiveOverlay : MonoBehaviour
                 "<b>TIPS:</b>  Gunakan skill [A], [S], [W] untuk combo mematikan"
               }
             : new string[] {
-                "<b>OBJEKTIF UTAMA:</b>  Selamatkan Pedagang Tua dari penjara monster",
-                "<b>OBJEKTIF TEMPUR:</b>  Basmi semua penjaga monster di reruntuhan",
-                "<b>OBJEKTIF RAHASIA:</b>  Temukan petunjuk lokasi orang yang kau cari"
+                "<b>OBJEKTIF UTAMA:</b>  Bantai seluruh Iblis Penjaga di reruntuhan",
+                "<b>OBJEKTIF KUNCI:</b>  Rebut Kunci Sel dari Komandan Iblis",
+                "<b>OBJEKTIF PENYELAMATAN:</b>  Buka Sel dan selamatkan Gadis Penyintas (Lyra)"
               };
 
         TMP_Text txtHeader = CreateTMP(briefingModal.transform, "TxtHeader", 15f, FontStyles.Bold,
@@ -227,7 +227,7 @@ public class StageObjectiveOverlay : MonoBehaviour
         heroRT.pivot     = new Vector2(0.5f, 1f);
         heroRT.anchoredPosition = new Vector2(0f, -94f);
         heroRT.sizeDelta = new Vector2(0f, 24f);
-        txtHeroInfo.text = $"⚔  KESATRIA TERPILIH: {selectedHeroName.ToUpper()}  ⚔";
+        txtHeroInfo.text = $"[ KESATRIA TERPILIH: {selectedHeroName.ToUpper()} ]";
 
         // Narrative / Sinopsis Box
         GameObject storyBox = new GameObject("StoryBox");

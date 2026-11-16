@@ -70,6 +70,28 @@ public class Player : Entity
     {
         base.Awake();
 
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
+
+        if (entityAttackPoint == null)
+        {
+            Transform ap = transform.Find("AttackPoint");
+            if (ap == null)
+            {
+                GameObject apGO = new GameObject("AttackPoint");
+                apGO.transform.SetParent(transform, false);
+                apGO.transform.localPosition = new Vector3(1.4f, -0.3f, 0f);
+                ap = apGO.transform;
+            }
+            entityAttackPoint = ap;
+        }
+
+        if (enemyLayer.value == 0) enemyLayer = LayerMask.GetMask("Enemy");
+        if (whatIsGround.value == 0) whatIsGround = LayerMask.GetMask("Ground");
+        if (whatIsTarget.value == 0) whatIsTarget = LayerMask.GetMask("Enemy");
+
         if (healthSlider != null)
         {
             healthSlider.maxValue = maxHealth;

@@ -152,7 +152,7 @@ public class StoryScene : MonoBehaviour
             // Beat 0: Masa Lalu Bahagia
             beats.Add(new StoryBeat {
                 chapterTag    = "PROLOG  •  HARI-HARI DAMAI & BAHAGIA",
-                onomatopoeia  = "《 ♬ 하하호호 (SENYUM & TAWA) 》",
+                onomatopoeia  = "[ HAHAHA! (SENYUM & TAWA) ]",
                 speaker       = "NARASI",
                 subtitle      = "10 Tahun Lalu — Lembah Bunga Ashenvale yang Penuh Kedamaian",
                 text          = "Dahulu kala, sebelum dunia hancur lebur... keluarga kami hidup begitu damai dan bahagia.\n\nAyah adalah pandai besi yang tekun, ibu selalu menyambut kami dengan roti hangat, dan aku bersama adikku tercinta, <color=#FFD6A5>Elora</color>, menghabiskan masa kecil bermain riang di padang bunga pegunungan. Elora tersenyum memeluk mahkota bunga, berjanji kita akan selalu bersama selamanya.",
@@ -165,7 +165,7 @@ public class StoryScene : MonoBehaviour
             // Beat 1: Hingga Pada Suatu Malam (Tragedi Dimulai)
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 1  •  HINGGA PADA SUATU MALAM...",
-                onomatopoeia  = "《 콰아아앙! (KABOOM!) 》",
+                onomatopoeia  = "[ KRAAA-BOOOM! (HANCUR LEBUR) ]",
                 speaker       = "TRAGEDI DESA ASHENVALE",
                 subtitle      = "Langit Terbelah & Serbuan Pasukan Jurang Abyssal",
                 text          = "Sampai pada suatu malam yang terkutuk... langit tiba-tiba berubah merah darah.\n\nGerbang Abyssal runtuh tepat di atas desa kami. Ribuan monster kegelapan memuntahkan api dan membakar rumah-rumah. Ayah gugur menahan pintu agar kami bisa lari. Ibu lenyap ditelan kobaran api. Dalam sekejap, tawa bahagia kami berganti menjadi jeritan keputusasaan.",
@@ -178,7 +178,7 @@ public class StoryScene : MonoBehaviour
             // Beat 2: Perpisahan yang Menyayat Hati
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 2  •  PERPISAHAN YANG TRAGIS",
-                onomatopoeia  = "《 쩌적—! (SNAP!) 》",
+                onomatopoeia  = "[ CRACK! (TERPUTUS TRAGIS) ]",
                 speaker       = "KAELEN (MASA LALU)",
                 subtitle      = "Genggaman Tangan yang Terlepas di Hadapan Maut",
                 text          = "\"ELORA! PEGANG TANGANKU! JANGAN LEPASKAN!\"\n\n\"Kakak... larilah... hiduplah untukku...\"\n\nSosok demon bertanduk bayangan merenggut Elora ke dalam portal kegelapan. Pedang kecil di tangan Kaelen patah berkeping-keping. Genggaman tangan mereka terlepas... meninggalkan Kaelen bersimbah darah di atas tanah abu, menangis dalam keputusasaan yang tak terobati.",
@@ -191,7 +191,7 @@ public class StoryScene : MonoBehaviour
             // Beat 3: Kebangkitan & Sumpah Pedang Bayangan
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 3  •  SUMPAH PEDANG BAYANGAN",
-                onomatopoeia  = "《 샤아아—! (SHADOW AWAKENING) 》",
+                onomatopoeia  = "[ SHWAAA! (SHADOW AWAKENING) ]",
                 speaker       = "SUMPAH KSATRIA BAYANGAN",
                 subtitle      = "Kelemahan Adalah Dosa Terbesar di Dunia Ini",
                 text          = "Kaelen memohon pertolongan pada Ksatria Kerajaan, namun mereka menolak dan mengejeknya: \"Adikmu sudah mati. Menyerahlah, bocah abu.\"\n\nDi malam kelam itu, Kaelen menelan serpihan <color=#8060FF>Inti Bayangan Terlarang</color>.\n\n\"Jika dunia dan ksatria suci berpaling... maka aku akan merangkul kegelapan! Aku bersumpah akan menjadi ksatria terkuat di dunia ini, dan aku tidak akan berhenti hingga Elora kembali!\"",
@@ -204,14 +204,14 @@ public class StoryScene : MonoBehaviour
             // Beat 4: Petunjuk Penyelamatan Stage 1
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 4  •  PETUNJUK PENYELAMATAN STAGE 1",
-                onomatopoeia  = "《 척! (THE RESCUE BEGINS) 》",
+                onomatopoeia  = "[ CLASH! (MISI PENYELAMATAN) ]",
                 speaker       = "PANGGILAN PENYELAMATAN",
-                subtitle      = "Tawanan Penyintas di Lembah Reruntuhan Kuno",
-                text          = "10 TAHUN BERLALU — SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nKaelen menemukan kabar pasti: Seorang tawanan penyintas dari kuil kuno disekap oleh algojo iblis di kedalaman <color=#FFD6A5>Lembah Reruntuhan Kuno</color>!\nTawanan ini memegang kunci rahasia lokasi ruang tahanan Elora.\n\n\"Bertahanlah sedikit lagi, Elora... Kakak datang untuk menyelamatkanmu!\"",
+                subtitle      = "Tawanan Gadis Penyintas di Sel Reruntuhan Kuno",
+                text          = "10 TAHUN BERLALU — SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nKaelen menemukan kabar pasti: Seorang gadis penyintas disekap di dalam sel besi kuil oleh para Iblis Penjaga untuk dijadikan tumbal Raja Iblis!\nGadis ini memegang rahasia kunci gerbang tahanan Elora.\n\n\"Bertahanlah sedikit lagi, Elora... Kakak datang untuk menyelamatkanmu!\"",
                 artSprite     = artAncientRuins,
                 moodColor     = new Color(1.00f, 0.85f, 0.35f, 1f), // Emas Harapan
                 sfxColor      = new Color(1.00f, 0.90f, 0.40f, 1f),
-                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1"
+                nextBtnLabel  = "▶  MULAI PENYELAMATAN STAGE 1"
             });
         }
         else
@@ -219,7 +219,7 @@ public class StoryScene : MonoBehaviour
             // ── KISAH VALERIA (THE CRIMSON VALKYRIE) ──────────────────────
             beats.Add(new StoryBeat {
                 chapterTag    = "PROLOG  •  HARI-HARI DAMAI PONDOK MAWAR",
-                onomatopoeia  = "《 ♬ 솔솔 (ANGIN SEGAR) 》",
+                onomatopoeia  = "[ WHISPER (ANGIN SEGAR) ]",
                 speaker       = "NARASI",
                 subtitle      = "15 Tahun Lalu — Pondok Tabib Damai di Perbatasan Timur",
                 text          = "Sebelum salju berlumur darah... keluarga Valeria adalah tabib pengelana yang penuh tawa.\n\nAyah dan ibu meracik obat penyembuh untuk warga desa, sementara kakak laki-lakinya, <color=#FF8080>Lian</color>, selalu menggendong Valeria kecil dan berjanji akan menjaganya dari bahaya apapun. Masa kecil yang hangat dan penuh kasih sayang.",
@@ -231,7 +231,7 @@ public class StoryScene : MonoBehaviour
 
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 1  •  MALAM PENYERGAPAN BADAI SALJU",
-                onomatopoeia  = "《 캉! 캉—! (CLASH!) 》",
+                onomatopoeia  = "[ CLASH! (SERANGAN MAUT) ]",
                 speaker       = "TRAGEDI KELUARGA VALERIA",
                 subtitle      = "Keserakahan Klan Pembunuh Bayangan",
                 text          = "Sampai pada suatu malam badai salju... ordo pembunuh bayaran gelap menyerbu rumah mereka demi merebut pusaka <color=#FF5050>Elixir Darah Murni</color>.\n\nAyah dan ibu tewas membeku di depan pintu. Lian menarik Valeria kecil ke dalam lemari tersembunyi dan menguncinya dari luar.\n\"Valeria... jangan menangis. Hiduplah. Untuk kakak!\"",
@@ -243,7 +243,7 @@ public class StoryScene : MonoBehaviour
 
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 2  •  PENGORBANAN SANG KAKAK",
-                onomatopoeia  = "《 꽈드득! (DESPAIR) 》",
+                onomatopoeia  = "[ DESPAIR! (KEPUTUSASAAN) ]",
                 speaker       = "VALERIA (MASA LALU)",
                 subtitle      = "Jeritan Bisu di Balik Celah Pintu Kayu",
                 text          = "Dari celah kayu lemari, Valeria menyaksikan kakaknya disiksa dan diseret hidup-hidup ke dalam gerbang jurang iblis.\n\nIa menggigit bibirnya hingga berdarah agar tidak menjerit. Sejak malam itu, air matanya membeku menjadi racun dendam yang takkan pernah padam.",
@@ -255,7 +255,7 @@ public class StoryScene : MonoBehaviour
 
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 3  •  ALGOJO KEMATIAN DARI JURANG",
-                onomatopoeia  = "《 쉬익—! (CRIMSON FANG) 》",
+                onomatopoeia  = "[ SLASH! (CRIMSON FANG) ]",
                 speaker       = "SUMPAH PISAU CRIMSON",
                 subtitle      = "Meminum Darah Iblis Demi Menjadi Predator Terkuat",
                 text          = "Valeria bertahan hidup belasan tahun di jurang kegelapan dengan meminum darah iblis terkutuk dan melatih pisau kembarnya hingga secepat kilat.\n\n\"Aku telah membuang kelemahan hatiku. Pedang kembarku akan menari dalam darah para pembantai itu hingga Lian kembali ke pelukanku!\"",
@@ -267,14 +267,14 @@ public class StoryScene : MonoBehaviour
 
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 4  •  PENYELAMATAN STAGE 1: LEMBAH RERUNTUHAN",
-                onomatopoeia  = "《 팟! (HUNTING STARTS) 》",
+                onomatopoeia  = "[ STRIKE! (PERBURUAN DIMULAI) ]",
                 speaker       = "PANGGILAN PENYELAMATAN",
                 subtitle      = "Medali Perak Sang Kakak Ditemukan di Reruntuhan Kuno",
-                text          = "SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nValeria menemukan medali perak milik Lian pada salah satu jasad iblis!\nJejak itu mengarah ke <color=#FF8080>Lembah Reruntuhan Kuno</color> — dimana seorang sandera penting disekap oleh algojo iblis. Sandera ini mengetahui lokasi ruang bawah tanah tempat kakaknya disekap!\n\n\"Tunggu aku, Kakak. Siapapun yang menghalangi jalan ini akan kubakar habis!\"",
+                text          = "SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nValeria menemukan medali perak milik Lian pada salah satu jasad iblis!\nJejak itu mengarah ke <color=#FF8080>Lembah Reruntuhan Kuno</color> — dimana seorang gadis sandera disekap dalam sel besi oleh algojo iblis sebagai tumbal Raja Iblis. Sandera ini mengetahui lokasi ruang bawah tanah rahasia tempat kakaknya disekap!\n\n\"Tunggu aku, Kakak. Siapapun yang menghalangi jalan ini akan kubakar habis!\"",
                 artSprite     = artAncientRuins,
                 moodColor     = new Color(1.00f, 0.80f, 0.30f, 1f),
                 sfxColor      = new Color(1.00f, 0.85f, 0.35f, 1f),
-                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1"
+                nextBtnLabel  = "▶  MULAI PENYELAMATAN STAGE 1"
             });
         }
     }
@@ -434,8 +434,8 @@ public class StoryScene : MonoBehaviour
         mfRT.anchorMin = new Vector2(0.5f, 0.5f);
         mfRT.anchorMax = new Vector2(0.5f, 0.5f);
         mfRT.pivot     = new Vector2(0.5f, 0.5f);
-        mfRT.sizeDelta = new Vector2(1140f, 540f);
-        mfRT.anchoredPosition = new Vector2(0f, 105f);
+        mfRT.sizeDelta = new Vector2(1140f, 460f);
+        mfRT.anchoredPosition = new Vector2(0f, 130f);
 
         // Frame Background & Sliced Modal Border
         Image frameBg = manhwaFrameGO.AddComponent<Image>();
@@ -496,7 +496,7 @@ public class StoryScene : MonoBehaviour
         txtManhwaSFX.outlineWidth = 0.25f;
         txtManhwaSFX.outlineColor = Color.black;
         txtManhwaSFX.characterSpacing = 3f;
-        txtManhwaSFX.text = "《 ♬ 하하호호 (SENYUM & TAWA) 》";
+        txtManhwaSFX.text = "[ HAHAHA! (SENYUM & TAWA) ]";
 
         // Chapter / Episode Tag Top-Right
         GameObject tagGO = new GameObject("ChapterTag");
@@ -532,8 +532,8 @@ public class StoryScene : MonoBehaviour
         cbRT.anchorMin = new Vector2(0.5f, 0.5f);
         cbRT.anchorMax = new Vector2(0.5f, 0.5f);
         cbRT.pivot     = new Vector2(0.5f, 0.5f);
-        cbRT.sizeDelta = new Vector2(1140f, 210f);
-        cbRT.anchoredPosition = new Vector2(0f, -250f);
+        cbRT.sizeDelta = new Vector2(1140f, 290f);
+        cbRT.anchoredPosition = new Vector2(0f, -196f);
 
         Image cbImg = captionBoxGO.AddComponent<Image>();
         if (modalPanelSprite != null) { cbImg.sprite = modalPanelSprite; cbImg.type = Image.Type.Sliced; }
@@ -549,14 +549,14 @@ public class StoryScene : MonoBehaviour
         pRT.anchorMin = new Vector2(0f, 1f); pRT.anchorMax = new Vector2(0f, 1f);
         pRT.pivot     = new Vector2(0f, 1f);
         pRT.anchoredPosition = new Vector2(30f, -14f);
-        pRT.sizeDelta = new Vector2(310f, 32f);
+        pRT.sizeDelta = new Vector2(320f, 32f);
 
         imgSpeakerPill = pillGO.AddComponent<Image>();
         if (btnFantasyNormal != null) { imgSpeakerPill.sprite = btnFantasyNormal; imgSpeakerPill.type = Image.Type.Sliced; }
         imgSpeakerPill.color = new Color(0.85f, 0.60f, 0.20f, 0.95f);
 
-        txtSpeakerBadge = CreateTMP(pillGO.transform, "TxtBadge", 13f, FontStyles.Bold,
-            new Color(0.06f, 0.04f, 0.08f, 1f), TextAlignmentOptions.Center);
+        txtSpeakerBadge = CreateTMP(pillGO.transform, "TxtBadge", 13.5f, FontStyles.Bold,
+            Color.white, TextAlignmentOptions.Center);
         txtSpeakerBadge.rectTransform.anchorMin = Vector2.zero; txtSpeakerBadge.rectTransform.anchorMax = Vector2.one;
         txtSpeakerBadge.rectTransform.offsetMin = Vector2.zero; txtSpeakerBadge.rectTransform.offsetMax = Vector2.zero;
         txtSpeakerBadge.characterSpacing = 2f;
@@ -564,11 +564,11 @@ public class StoryScene : MonoBehaviour
 
         // Subtitle Context (Di samping speaker pill)
         txtChapterSubtitle = CreateTMP(captionBoxGO.transform, "TxtSubtitle", 13f, FontStyles.Italic,
-            new Color(0.85f, 0.80f, 0.70f, 0.85f), TextAlignmentOptions.Left);
+            new Color(0.92f, 0.88f, 0.75f, 0.95f), TextAlignmentOptions.Left);
         txtChapterSubtitle.rectTransform.anchorMin = new Vector2(0f, 1f); txtChapterSubtitle.rectTransform.anchorMax = new Vector2(1f, 1f);
         txtChapterSubtitle.rectTransform.pivot     = new Vector2(0f, 1f);
-        txtChapterSubtitle.rectTransform.anchoredPosition = new Vector2(360f, -15f);
-        txtChapterSubtitle.rectTransform.sizeDelta = new Vector2(-390f, 30f);
+        txtChapterSubtitle.rectTransform.anchoredPosition = new Vector2(370f, -15f);
+        txtChapterSubtitle.rectTransform.sizeDelta = new Vector2(-400f, 30f);
         txtChapterSubtitle.text = "10 Tahun Lalu — Lembah Bunga Ashenvale";
 
         // Narrative / Dialogue Body Text
@@ -577,17 +577,19 @@ public class StoryScene : MonoBehaviour
         RectTransform bRT = bodyGO.AddComponent<RectTransform>();
         bRT.anchorMin = Vector2.zero; bRT.anchorMax = Vector2.one;
         bRT.offsetMin = new Vector2(30f, 14f);
-        bRT.offsetMax = new Vector2(-30f, -52f);
+        bRT.offsetMax = new Vector2(-30f, -55f);
 
         txtNarrativeDialogue = bodyGO.AddComponent<TextMeshProUGUI>();
         txtNarrativeDialogue.font = tmpFont;
-        txtNarrativeDialogue.fontSize = 19f;
+        txtNarrativeDialogue.enableAutoSizing = true;
+        txtNarrativeDialogue.fontSizeMin = 12f;
+        txtNarrativeDialogue.fontSizeMax = 16f;
         txtNarrativeDialogue.fontStyle = FontStyles.Normal;
         txtNarrativeDialogue.color = new Color(1f, 0.95f, 0.90f, 1f);
-        txtNarrativeDialogue.alignment = TextAlignmentOptions.Left;
+        txtNarrativeDialogue.alignment = TextAlignmentOptions.TopLeft;
         txtNarrativeDialogue.enableWordWrapping = true;
-        txtNarrativeDialogue.lineSpacing = 6f;
-        txtNarrativeDialogue.overflowMode = TextOverflowModes.Truncate;
+        txtNarrativeDialogue.lineSpacing = 2f;
+        txtNarrativeDialogue.overflowMode = TextOverflowModes.Ellipsis;
         txtNarrativeDialogue.richText = true;
     }
 
@@ -718,6 +720,9 @@ public class StoryScene : MonoBehaviour
         if (txtSpeakerBadge != null)
         {
             txtSpeakerBadge.text = $"[ {beat.speaker} ]";
+            txtSpeakerBadge.color = Color.white;
+            txtSpeakerBadge.outlineWidth = 0.25f;
+            txtSpeakerBadge.outlineColor = Color.black;
             imgSpeakerPill.color = beat.moodColor;
         }
         if (txtChapterSubtitle != null)
