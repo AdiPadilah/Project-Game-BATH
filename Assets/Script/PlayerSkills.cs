@@ -289,9 +289,17 @@ public class PlayerSkills : MonoBehaviour
         float dir = player.facingRight ? 1f : -1f;
 
         // ══════════════════════════════════════════════════════════════════════
-        // CUT-IN ANIMATION (Sebelum apapun: banner slide masuk dari kanan)
+        // PRE-ULTIMATE: Layar perlahan menggelap (atmosfer sebelum ultimate)
+        // ══════════════════════════════════════════════════════════════════════
+        yield return StartCoroutine(DarkenScreen(0.30f, 0.75f));   // fade ke gelap 0.3s
+
+        // ══════════════════════════════════════════════════════════════════════
+        // CUT-IN ANIMATION (banner slide masuk dari kanan, layar masih gelap)
         // ══════════════════════════════════════════════════════════════════════
         yield return StartCoroutine(ShowUltimateCutIn());
+
+        // Layar terang kembali saat ultimate mulai
+        yield return StartCoroutine(BrightenScreen(0.18f));
 
         // ── FASE 1: Dramatic Anime Time Freeze ────────────────────────────────
         Time.timeScale = 0.08f;
@@ -318,14 +326,12 @@ public class PlayerSkills : MonoBehaviour
         int sliceDmg = 25;
 
         float[] angles = new float[] { 15f, -35f, 60f, -60f, 40f, -10f };
-        List<Vector3> lingeringSlashPositions = new List<Vector3>();
 
         for (int i = 0; i < hitCount; i++)
         {
             SpawnAfterimage(new Color(1f, 0.25f, 0.2f, 0.75f));
 
             Vector3 slashPos = transform.position + new Vector3(Random.Range(-1.0f, 2.8f) * dir, Random.Range(-0.5f, 1.5f), 0f);
-            lingeringSlashPositions.Add(slashPos);
 
             SpawnVisualFX(slashPos, fxSlashCross, Vector3.one * Random.Range(1.8f, 2.4f), angles[i], 0.90f, new Color(1f, 0.95f, 0.8f, 0.95f));
             SpawnVisualFX(slashPos, fxSlashArc, Vector3.one * Random.Range(1.9f, 2.6f), -angles[i], 0.85f, new Color(1f, 0.85f, 0.3f, 0.9f));
@@ -345,24 +351,12 @@ public class PlayerSkills : MonoBehaviour
 
         rb.velocity = Vector2.zero;
 
-        // ── FASE 3: DRAMATIC DELAY / SUSPENSE ─────────────────────────────────
-        float delayPopOut = 0.52f;
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(delayPopOut, 0.12f);
-
-        yield return new WaitForSeconds(delayPopOut);
-
-        // ── FASE 4: POP-OUT FINISHER DETONATION ───────────────────────────────
+        // ── FASE 3: DETONASI LANGSUNG (tanpa delay pop-out) ───────────────────
         if (sfxUltimatePop != null && audioSource != null)
             audioSource.PlayOneShot(sfxUltimatePop, 1.4f);
 
         if (CameraFollow.instance != null)
             CameraFollow.instance.TriggerScreenShake(0.70f, 0.55f);
-
-        foreach (var pos in lingeringSlashPositions)
-        {
-            SpawnVisualFX(pos, fxSlashCross, Vector3.one * 2.4f, Random.Range(-45f, 45f), 0.35f, Color.white, true, 2.6f);
-        }
 
         Vector3 blastCenter = transform.position - new Vector3(dir * 2.0f, -0.4f, 0f);
         SpawnVisualFX(blastCenter, fxSlashCross, Vector3.one * 4.5f, 0f, 0.55f, Color.white, true, 3.5f);
@@ -384,6 +378,57 @@ public class PlayerSkills : MonoBehaviour
         player.SetInvincible(false);
         player.canMove = true;
         isCastingSkill = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCREEN DARKENING: Layar menggelap perlahan sebelum ultimate
+    // ─────────────────────────────────────────────────────────────────────────
+    private GameObject _darkOverlayGO;
+
+    private IEnumerator DarkenScreen(float duration, float targetAlpha)
+    {
+        // Buat canvas overlay gelap di atas segalanya (order 89)
+        _darkOverlayGO = new GameObject("UltDark_Overlay");
+        Canvas c = _darkOverlayGO.AddComponent<Canvas>();
+        c.renderMode = RenderMode.ScreenSpaceOverlay;
+        c.sortingOrder = 89;
+
+        GameObject imgGO = new GameObject("Dark_Panel");
+        imgGO.transform.SetParent(_darkOverlayGO.transform, false);
+        RectTransform rt = imgGO.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+        Image img = imgGO.AddComponent<Image>();
+        img.color = new Color(0f, 0f, 0f, 0f);
+        img.raycastTarget = false;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            img.color = new Color(0f, 0f, 0f, Mathf.Lerp(0f, targetAlpha, elapsed / duration));
+            yield return null;
+        }
+        img.color = new Color(0f, 0f, 0f, targetAlpha);
+    }
+
+    private IEnumerator BrightenScreen(float duration)
+    {
+        if (_darkOverlayGO == null) yield break;
+        Image img = _darkOverlayGO.GetComponentInChildren<Image>();
+        if (img == null) { Object.Destroy(_darkOverlayGO); yield break; }
+
+        float startAlpha = img.color.a;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            img.color = new Color(0f, 0f, 0f, Mathf.Lerp(startAlpha, 0f, elapsed / duration));
+            yield return null;
+        }
+        Object.Destroy(_darkOverlayGO);
+        _darkOverlayGO = null;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
