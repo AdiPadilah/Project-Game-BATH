@@ -6,61 +6,64 @@ using System.Collections.Generic;
 /// <summary>
 /// BossAI — King Demon Slime
 ///
-/// SKILL 1 : Lava Dash  — Boss ngedash ke arah player (selalu aktif)
-/// SKILL 2 : Twin Slash + Lava Burst — 2x tebasan + lava keluar dari tanah (selalu aktif)
-/// SKILL 3 : Lava Gasing (Spin) — berputar seperti gasing dengan efek lava
-///            HANYA aktif saat HP <= 50%
+/// SKILL 1 : Lava Dash      — Boss melesat kencang ke arah player + jejak lava di lantai
+/// SKILL 2 : Twin Slash    — 2x ayunan tebasan cakar/pedang + letusan lava di tanah bawah player
+/// SKILL 3 : Cyclone Sweep — Seperti Skill 2 BALMOND (Mobile Legends):
+///            - Muter pedang KE SAMPING (horizontal, bukan ke atas!)
+///            - Badan bos IKUT BERGERAK mengejar player sambil muter
+///            - Berputar selama 3.5 detik dengan efek lava berputar horizontal
+///            - HANYA aktif saat darah bos di bawah 50% (HP <= 50%)
 /// </summary>
 public class BossAI : Entity
 {
-    // ─── Movement ────────────────────────────────────────────────────────────
+    // ─── Movement ─────────────────────────────────────────────────────────────
     [Header("Movement")]
-    public float moveSpeed   = 8f;
-    public float stopDistance = 1.5f;
+    public float moveSpeed    = 6f;
+    public float stopDistance = 1.8f;
 
-    // ─── Visual ──────────────────────────────────────────────────────────────
+    // ─── Visual ───────────────────────────────────────────────────────────────
     [Header("Visual & Size")]
     public float bossScale = 1.8f;
 
-    // ─── Skill 1: Lava Dash ──────────────────────────────────────────────────
+    // ─── Skill 1: Lava Dash ───────────────────────────────────────────────────
     [Header("Skill 1 - Lava Dash")]
-    public float skill1Cooldown = 4.0f;
-    public int   skill1Damage   = 20;
-    public float skill1DashSpeed = 24f;
-    public float skill1DashDuration = 0.30f;
+    public float skill1Cooldown  = 5.0f;
+    public int   skill1Damage    = 22;
+    public float skill1DashSpeed = 20f;
+    public float skill1DashDur   = 0.28f;
 
-    // ─── Skill 2: Twin Slash + Lava Burst ────────────────────────────────────
-    [Header("Skill 2 - Twin Slash + Lava Burst")]
-    public float skill2Cooldown   = 6.0f;
-    public int   skill2SlashDamage = 18;   // per tebasan (x2)
-    public int   skill2LavaDamage  = 30;   // lava yang keluar
-    public float skill2AttackRange = 3.5f;
+    // ─── Skill 2: Twin Slash + Lava Pool ──────────────────────────────────────
+    [Header("Skill 2 - Twin Slash + Lava Pool")]
+    public float skill2Cooldown  = 6.0f;
+    public int   skill2SlashDmg  = 20;
+    public int   skill2LavaDmg   = 25;
+    public float skill2Range     = 3.2f;
 
-    // ─── Skill 3: Lava Gasing (HP <= 50% only) ───────────────────────────────
-    [Header("Skill 3 - Lava Gasing [HP < 50% ONLY]")]
-    public float skill3Cooldown    = 10.0f;
-    public int   skill3SpinDamage  = 15;   // damage per tick saat spin
-    public float skill3SpinDuration = 3.0f;
-    public float skill3SpinRadius  = 4.5f;
-    private bool skill3Unlocked    = false; // unlock saat HP <= 50%
+    // ─── Skill 3: Balmond Cyclone Sweep (HP <= 50% only) ──────────────────────
+    [Header("Skill 3 - Balmond Cyclone Sweep [HP <= 50% ONLY]")]
+    public float skill3Cooldown   = 12.0f;
+    public int   skill3SpinDmg    = 14;     // Damage per tick saat memutar
+    public float skill3Duration   = 3.5f;   // Durasi putaran
+    public float skill3Radius     = 3.8f;   // Jangkauan pedang memutar
+    public float skill3ChaseSpeed = 7.0f;   // Kecepatan bos berjalan sambil muter (Balmond style)
+    private bool skill3Unlocked   = false;
 
-    // ─── Layer ───────────────────────────────────────────────────────────────
+    // ─── Layer ────────────────────────────────────────────────────────────────
     public LayerMask playerLayer;
 
-    // ─── UI ──────────────────────────────────────────────────────────────────
+    // ─── UI ───────────────────────────────────────────────────────────────────
     [Header("UI")]
     public Slider bossHealthBar;
 
-    // ─── Hit Effect ──────────────────────────────────────────────────────────
+    // ─── Hit Effect ───────────────────────────────────────────────────────────
     [Header("Hit Effect")]
     public Color hitColor    = Color.red;
     public float hitDuration = 0.1f;
 
-    // ─── Knockback ───────────────────────────────────────────────────────────
     [Header("Knockback")]
     public float knockbackTime = 0.2f;
 
-    // ─── Audio ───────────────────────────────────────────────────────────────
+    // ─── Audio ────────────────────────────────────────────────────────────────
     [Header("Audio")]
     public AudioSource audioSource;
     public AudioClip   attackSound;
@@ -68,15 +71,17 @@ public class BossAI : Entity
     public AudioClip   deathSound;
     public AudioClip   roarSound;
 
-    // ─── FX Sprites (di-load dari Resources) ─────────────────────────────────
+    // ─── FX Sprites ───────────────────────────────────────────────────────────
     private Sprite fxSlashArc;
     private Sprite fxSlashCross;
     private Sprite fxWhirlwind;
     private Sprite fxLavaPool;
     private Sprite fxLavaSplash;
     private Sprite fxSpinRing;
+    private Sprite fxHorizontalCyclone;
+    private Sprite fxHorizontalSlash;
 
-    // ─── State ───────────────────────────────────────────────────────────────
+    // ─── State ────────────────────────────────────────────────────────────────
     private Transform player;
     private bool isAttacking      = false;
     private bool isKnocked        = false;
@@ -90,7 +95,6 @@ public class BossAI : Entity
     private float skill3Timer = 0f;
 
     private Color originalColor;
-    private Coroutine attackTimeoutCoroutine;
 
     // ─────────────────────────────────────────────────────────────────────────
     protected override void Awake()
@@ -104,10 +108,10 @@ public class BossAI : Entity
         if (sr != null) originalColor = sr.color;
 
         bossScale = Mathf.Abs(transform.localScale.y) > 0.1f
-            ? Mathf.Abs(transform.localScale.y) : 1.8f;
+                  ? Mathf.Abs(transform.localScale.y) : 1.8f;
         bossScale = Mathf.Clamp(bossScale, 1.5f, 2.0f);
 
-        LoadFXSprites();
+        LoadFX();
 
         if (roarSound == null)
         {
@@ -121,43 +125,45 @@ public class BossAI : Entity
         {
             bossHealthBar.maxValue = maxHealth;
             bossHealthBar.value    = maxHealth;
-            SetupBossNameText();
+            SetupNameText();
         }
     }
 
-    private void LoadFXSprites()
+    private void LoadFX()
     {
-        fxSlashArc   = Resources.Load<Sprite>("FX/fx_slash_arc_gold");
-        fxSlashCross = Resources.Load<Sprite>("FX/fx_slash_cross");
-        fxWhirlwind  = Resources.Load<Sprite>("FX/fx_whirlwind_ring");
-        fxLavaPool   = Resources.Load<Sprite>("FX/fx_lava_pool");
-        fxLavaSplash = Resources.Load<Sprite>("FX/fx_lava_splash");
-        fxSpinRing   = Resources.Load<Sprite>("FX/fx_spin_ring");
+        fxSlashArc          = Resources.Load<Sprite>("FX/fx_slash_arc_gold");
+        fxSlashCross        = Resources.Load<Sprite>("FX/fx_slash_cross");
+        fxWhirlwind         = Resources.Load<Sprite>("FX/fx_whirlwind_ring");
+        fxLavaPool          = Resources.Load<Sprite>("FX/fx_lava_pool");
+        fxLavaSplash        = Resources.Load<Sprite>("FX/fx_lava_splash");
+        fxSpinRing          = Resources.Load<Sprite>("FX/fx_spin_ring");
+        fxHorizontalCyclone = Resources.Load<Sprite>("FX/fx_horizontal_cyclone");
+        fxHorizontalSlash   = Resources.Load<Sprite>("FX/fx_horizontal_slash");
     }
 
-    private void SetupBossNameText()
+    private void SetupNameText()
     {
         if (bossHealthBar == null) return;
         Text t = bossHealthBar.GetComponentInChildren<Text>();
         if (t == null)
         {
-            GameObject go = new GameObject("BossNameLabel");
+            GameObject go = new GameObject("BossName");
             go.transform.SetParent(bossHealthBar.transform, false);
-            t = go.AddComponent<Text>();
+            t           = go.AddComponent<Text>();
             t.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             t.fontSize  = 22;
             t.fontStyle = FontStyle.Bold;
             t.alignment = TextAnchor.MiddleCenter;
             t.color     = new Color(1f, 0.85f, 0.45f, 1f);
-            RectTransform rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot     = new Vector2(0.5f, 0f);
+            RectTransform rt    = go.GetComponent<RectTransform>();
+            rt.anchorMin        = new Vector2(0f, 1f);
+            rt.anchorMax        = new Vector2(1f, 1f);
+            rt.pivot            = new Vector2(0.5f, 0f);
             rt.anchoredPosition = new Vector2(0f, 4f);
-            rt.sizeDelta = new Vector2(0f, 26f);
-            Outline outline = go.AddComponent<Outline>();
-            outline.effectColor    = new Color(0.15f, 0.02f, 0.02f, 1f);
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            rt.sizeDelta        = new Vector2(0f, 26f);
+            Outline o           = go.AddComponent<Outline>();
+            o.effectColor    = new Color(0.15f, 0.02f, 0.02f, 1f);
+            o.effectDistance = new Vector2(1.5f, -1.5f);
         }
         t.text = "King Demon Slime";
     }
@@ -170,8 +176,8 @@ public class BossAI : Entity
         if (hit.collider != null)
         {
             Collider2D bc = GetComponent<Collider2D>();
-            float offset  = bc != null ? bc.bounds.extents.y : 1.4f;
-            transform.position = new Vector3(transform.position.x, hit.point.y + offset, 0f);
+            float off     = bc != null ? bc.bounds.extents.y : 1.4f;
+            transform.position = new Vector3(transform.position.x, hit.point.y + off, 0f);
             if (rb != null) rb.velocity = Vector2.zero;
         }
     }
@@ -184,106 +190,98 @@ public class BossAI : Entity
         if (UI.instance != null && UI.instance.isGameOver) { FreezeBoss(); return; }
         if (!bossActive || player == null || isDead) return;
         if (isKnocked)   { rb.velocity = Vector2.zero; return; }
-        if (isAttacking) { rb.velocity = Vector2.zero; return; }
+        if (isAttacking) return; // Note: isAttacking handled inside coroutines
 
-        // Tick timers
         if (skill1Timer > 0f) skill1Timer -= Time.deltaTime;
         if (skill2Timer > 0f) skill2Timer -= Time.deltaTime;
         if (skill3Timer > 0f) skill3Timer -= Time.deltaTime;
 
-        // Cek unlock skill 3 (HP <= 50%)
+        // Unlock Skill 3 saat HP turun ke 50%
         if (!skill3Unlocked && currentHealth <= maxHealth * 0.5f)
         {
             skill3Unlocked = true;
-            skill3Timer    = 2.0f;  // Langsung siap dalam 2 detik setelah unlock
-            // Flash peringatan merah
-            StartCoroutine(UnlockSkill3Flash());
+            skill3Timer    = 1.0f; // Segera siap digunakan
+            StartCoroutine(Skill3UnlockWarning());
         }
 
         FlipToPlayer();
 
         float hDist = Mathf.Abs(player.position.x - transform.position.x);
         float vDist = Mathf.Abs(player.position.y - transform.position.y);
-        bool  close = hDist <= skill2AttackRange && vDist <= 4f;
+        bool  close = hDist <= skill2Range && vDist <= 3.5f;
 
-        // ── Prioritas skill ───────────────────────────────────────────────────
-        // Skill 3: Gasing lava (paling kuat, prioritas tertinggi jika unlock)
-        if (skill3Unlocked && skill3Timer <= 0f && hDist < skill3SpinRadius + 2f)
+        // Prioritas Skill:
+        // 1. Skill 3 (Balmond Cyclone) jika unlock & siap
+        if (skill3Unlocked && skill3Timer <= 0f && hDist <= 12f)
         {
-            StartCoroutine(LavaGasingRoutine());
+            StartCoroutine(BalmondCycloneRoutine());
             return;
         }
 
-        // Skill 1: Dash (jika player agak jauh)
-        if (skill1Timer <= 0f && hDist > skill2AttackRange && hDist < 15f)
+        // 2. Skill 1 (Lava Dash) jika jarak menengah
+        if (skill1Timer <= 0f && hDist > skill2Range + 0.5f && hDist < 14f)
         {
             StartCoroutine(LavaDashRoutine());
             return;
         }
 
-        // Skill 2: Twin Slash + Lava (jika player dekat)
+        // 3. Skill 2 (Twin Slash + Lava) jika jarak dekat
         if (close && skill2Timer <= 0f)
         {
-            StartCoroutine(TwinSlashLavaBurstRoutine());
+            StartCoroutine(TwinSlashRoutine());
             return;
         }
 
-        // Jika tidak ada skill ready: dekati player biasa
+        // Gerak biasa jika tidak ada skill ready
         if (!close) MoveToPlayer(player.position.x - transform.position.x);
         else         Stop();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
     // SKILL 1 — LAVA DASH
-    // Boss melesat dengan jejak lava membakar ke arah player
+    // Boss ngedash lurus ke arah player, meninggalkan jejak lava di lantai
     // ═════════════════════════════════════════════════════════════════════════
     private IEnumerator LavaDashRoutine()
     {
         isAttacking = true;
         skill1Timer = skill1Cooldown;
+        rb.velocity = Vector2.zero;
 
         if (anim != null) anim.SetBool("isMoving", false);
 
-        // Windup singkat: warna oranye membara
-        float wu = 0.22f, we = 0f;
-        while (we < wu)
-        {
-            we += Time.deltaTime;
-            if (sr != null) sr.color = Color.Lerp(originalColor, new Color(1.4f, 0.5f, 0.0f, 1f), we / wu);
-            yield return null;
-        }
-        if (sr != null) sr.color = originalColor;
+        // Windup: ancang-ancang menyala oranye
+        yield return StartCoroutine(ColorPulse(new Color(1.3f, 0.55f, 0.0f, 1f), 0.22f));
 
         if (player == null || isDead) { isAttacking = false; yield break; }
-
-        float dir = Mathf.Sign(player.position.x - transform.position.x);
-        rb.velocity = new Vector2(dir * skill1DashSpeed, rb.velocity.y);
 
         if (attackSound != null && audioSource != null)
             audioSource.PlayOneShot(attackSound, 1.1f);
 
-        HashSet<Entity> hitSet  = new HashSet<Entity>();
-        List<Vector3>   lavaPos = new List<Vector3>();
+        float dir     = Mathf.Sign(player.position.x - transform.position.x);
         float elapsed = 0f;
+        HashSet<Entity> hitSet = new HashSet<Entity>();
 
-        while (elapsed < skill1DashDuration)
+        while (elapsed < skill1DashDur)
         {
             elapsed += Time.deltaTime;
+            rb.velocity = new Vector2(dir * skill1DashSpeed, rb.velocity.y);
 
-            // Jejak lava saat dash
-            if (Random.value < 0.4f)
+            SpawnAfterimage(new Color(0.9f, 0.3f, 0.0f, 0.55f));
+
+            // Jejak lava di tanah di bawah kaki
+            if (Random.value < 0.35f)
             {
-                Vector3 lp = transform.position + new Vector3(-dir * Random.Range(0.3f, 1.2f), -0.5f, 0f);
-                lavaPos.Add(lp);
-                SpawnFX(lp, fxLavaSplash, new Vector3(dir * 0.7f, 0.7f, 1f), 0f, 0.4f,
-                        new Color(1f, 0.4f, 0.0f, 0.9f), false);
+                Vector3 groundPos = new Vector3(
+                    transform.position.x - dir * Random.Range(0.2f, 0.8f),
+                    transform.position.y - 0.55f,
+                    0f);
+                SpawnFX(groundPos, fxLavaPool,
+                        new Vector3(Random.Range(0.5f, 0.9f), 0.5f, 1f),
+                        0f, 0.6f, new Color(1f, 0.3f, 0.0f, 0.75f), true, 1.05f);
             }
 
-            // Afterimage merah-oranye
-            SpawnAfterimage(new Color(1f, 0.35f, 0.0f, 0.65f));
-
-            // Damage saat menyentuh player
-            Collider2D hit = Physics2D.OverlapCircle(transform.position, 1.4f, playerLayer);
+            // Tabrak player
+            Collider2D hit = Physics2D.OverlapCircle(transform.position, 1.5f, playerLayer);
             if (hit != null)
             {
                 Entity ent = hit.GetComponent<Entity>();
@@ -291,6 +289,9 @@ public class BossAI : Entity
                 {
                     hitSet.Add(ent);
                     ent.TakeDamage(skill1Damage, true);
+                    SpawnFX(hit.transform.position, fxSlashCross,
+                            Vector3.one * 0.9f, Random.Range(-20f, 20f),
+                            0.22f, new Color(1f, 0.6f, 0.1f, 0.95f));
                 }
             }
 
@@ -299,111 +300,120 @@ public class BossAI : Entity
 
         rb.velocity = Vector2.zero;
 
-        // Tinggalkan pool lava di tanah setelah dash
-        Vector3 poolPos = transform.position + new Vector3(0f, -0.4f, 0f);
-        SpawnFX(poolPos, fxLavaPool, new Vector3(2.0f, 1.2f, 1f), 0f, 1.8f,
-                new Color(1f, 0.3f, 0.0f, 0.85f), true, 1.1f);
-
-        // Screen shake kecil
         if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.22f, 0.20f);
+            CameraFollow.instance.TriggerScreenShake(0.20f, 0.18f);
+
+        // Pool lava tersisa di tanah
+        Vector3 poolGround = new Vector3(transform.position.x, transform.position.y - 0.55f, 0f);
+        SpawnFX(poolGround, fxLavaPool,
+                new Vector3(2.2f, 0.9f, 1f), 0f, 1.5f,
+                new Color(1f, 0.28f, 0.0f, 0.80f), true, 1.08f);
 
         yield return new WaitForSeconds(0.25f);
         isAttacking = false;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // SKILL 2 — TWIN SLASH + LAVA BURST
-    // 2 kali tebasan, lalu lava muncrat dari tanah di bawah player
+    // SKILL 2 — TWIN SLASH + LAVA POOL
+    // 2x tebasan langsung + semburan lava dari tanah bawah kaki player
     // ═════════════════════════════════════════════════════════════════════════
-    private IEnumerator TwinSlashLavaBurstRoutine()
+    private IEnumerator TwinSlashRoutine()
     {
         isAttacking = true;
         skill2Timer = skill2Cooldown;
-
         rb.velocity = Vector2.zero;
-        if (anim != null) { anim.SetBool("isMoving", false); anim.SetTrigger("Cleave"); }
 
+        if (anim != null) { anim.SetBool("isMoving", false); anim.SetTrigger("Cleave"); }
         if (attackSound != null && audioSource != null)
             audioSource.PlayOneShot(attackSound, 1.0f);
 
-        // ── TEBASAN 1 ─────────────────────────────────────────────────────────
-        yield return new WaitForSeconds(0.30f);
-
-        Vector3 slash1Pos = transform.position + new Vector3((facingRight ? 1f : -1f) * 1.5f, 0.3f, 0f);
-        SpawnFX(slash1Pos, fxSlashArc,  Vector3.one * 1.4f, facingRight ? 30f : -30f, 0.25f, Color.white);
-        SpawnFX(slash1Pos, fxSlashCross, Vector3.one * 1.1f, 0f, 0.22f, new Color(1f, 0.7f, 0.2f, 0.9f));
-
-        DealSlashDamage(skill2SlashDamage, false);
-
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.20f, 0.18f);
-
+        // ── AYUNAN 1 ─────────────────────────────────────────────────────────
         yield return new WaitForSeconds(0.28f);
 
-        // ── TEBASAN 2 (lebih kuat) ────────────────────────────────────────────
-        if (anim != null) anim.SetTrigger("Cleave");
-        if (attackSound != null && audioSource != null)
-            audioSource.PlayOneShot(attackSound, 1.2f);
+        float faceDir = transform.localScale.x < 0 ? 1f : -1f;
+        Vector3 swingOffset1 = new Vector3(faceDir * 1.3f, 0.2f, 0f);
 
-        Vector3 slash2Pos = transform.position + new Vector3((facingRight ? 1f : -1f) * 1.8f, 0.0f, 0f);
-        SpawnFX(slash2Pos, fxSlashCross, Vector3.one * 1.6f, facingRight ? -20f : 20f, 0.28f,
-                new Color(1f, 0.85f, 0.3f, 1f));
-        SpawnFX(slash2Pos, fxSlashArc,   new Vector3(facingRight ? 1.5f : -1.5f, 1.5f, 1f),
-                0f, 0.25f, Color.white);
+        SpawnFX(transform.position + swingOffset1, fxSlashArc,
+                new Vector3(faceDir * 1.3f, 1.3f, 1f),
+                faceDir > 0 ? 25f : -25f, 0.22f,
+                new Color(1f, 0.7f, 0.2f, 1f));
+        SpawnFX(transform.position + swingOffset1 * 0.7f, fxSlashCross,
+                Vector3.one * 0.9f, 0f, 0.20f, Color.white);
 
-        DealSlashDamage(skill2SlashDamage, true);  // Tebasan 2 pakai knockback
+        HitMelee(skill2SlashDmg, false);
 
         if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.30f, 0.25f);
+            CameraFollow.instance.TriggerScreenShake(0.18f, 0.15f);
 
         yield return new WaitForSeconds(0.30f);
 
-        // ── LAVA BURST: lava muncrat dari tanah ───────────────────────────────
-        // Targetnya posisi player saat ini + sedikit offset random
+        // ── AYUNAN 2 (lebih kuat) ────────────────────────────────────────────
+        if (anim != null) anim.SetTrigger("Cleave");
+        if (attackSound != null && audioSource != null)
+            audioSource.PlayOneShot(attackSound, 1.15f);
+
+        Vector3 swingOffset2 = new Vector3(faceDir * 1.5f, -0.1f, 0f);
+
+        SpawnFX(transform.position + swingOffset2, fxSlashArc,
+                new Vector3(faceDir * 1.5f, 1.5f, 1f),
+                faceDir > 0 ? -20f : 20f, 0.25f,
+                new Color(1f, 0.85f, 0.3f, 1f));
+        SpawnFX(transform.position + swingOffset2 * 0.6f, fxSlashCross,
+                Vector3.one * 1.1f, faceDir > 0 ? 15f : -15f, 0.22f,
+                new Color(1f, 0.65f, 0.1f, 0.9f));
+
+        HitMelee(skill2SlashDmg, true);
+
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(0.28f, 0.22f);
+
+        yield return new WaitForSeconds(0.25f);
+
+        // ── LAVA BURST DI BAWAH KAKI PLAYER ──────────────────────────────────
         if (player != null)
         {
-            int lavaBurstCount = 3;
-            for (int i = 0; i < lavaBurstCount; i++)
+            for (int i = 0; i < 3; i++)
             {
-                float offsetX = Random.Range(-2.0f, 2.0f);
-                Vector3 burstPos = player.position + new Vector3(offsetX, 0f, 0f);
+                float offsetX = (i - 1) * 1.4f;
+                Vector3 lavaGroundPos = new Vector3(
+                    player.position.x + offsetX,
+                    player.position.y - 0.4f,
+                    0f);
 
-                // Lava splash ke atas
-                SpawnFX(burstPos, fxLavaSplash, new Vector3(Random.Range(0.8f, 1.3f), Random.Range(1.0f, 1.6f), 1f),
-                        Random.Range(-15f, 15f), 0.55f, new Color(1f, 0.35f, 0.0f, 0.95f), true, 1.2f);
+                SpawnFX(lavaGroundPos, fxLavaSplash,
+                        new Vector3(0.9f, 1.2f, 1f), 0f, 0.5f,
+                        new Color(1f, 0.35f, 0.0f, 0.90f), true, 1.15f);
 
-                // Pool lava di tanah
-                SpawnFX(burstPos + Vector3.down * 0.3f, fxLavaPool,
-                        new Vector3(1.5f + Random.value, 0.9f, 1f), 0f, 1.4f,
-                        new Color(1f, 0.25f, 0.0f, 0.80f), true, 1.05f);
+                SpawnFX(lavaGroundPos + Vector3.down * 0.1f, fxLavaPool,
+                        new Vector3(1.4f, 0.7f, 1f), 0f, 1.2f,
+                        new Color(1f, 0.22f, 0.0f, 0.78f), true, 1.06f);
 
-                // Damage area lava
-                Collider2D[] hits = Physics2D.OverlapCircleAll(burstPos, 1.8f, playerLayer);
-                foreach (var h in hits)
+                Collider2D[] nearPlayer = Physics2D.OverlapCircleAll(lavaGroundPos, 1.5f, playerLayer);
+                foreach (var h in nearPlayer)
                 {
                     Entity ent = h.GetComponent<Entity>();
-                    if (ent != null) ent.TakeDamage(skill2LavaDamage / lavaBurstCount, false);
+                    if (ent != null) ent.TakeDamage(skill2LavaDmg / 3, false);
                 }
 
-                yield return new WaitForSeconds(0.14f);  // Jeda antar burst
+                yield return new WaitForSeconds(0.15f);
             }
 
             if (CameraFollow.instance != null)
-                CameraFollow.instance.TriggerScreenShake(0.38f, 0.32f);
+                CameraFollow.instance.TriggerScreenShake(0.32f, 0.28f);
         }
 
-        yield return new WaitForSeconds(0.30f);
+        yield return new WaitForSeconds(0.25f);
         isAttacking = false;
     }
 
-    private void DealSlashDamage(int dmg, bool knockback)
+    private void HitMelee(int dmg, bool knockback)
     {
         if (player == null) return;
-        float range = skill2AttackRange + 0.5f;
         Collider2D[] hits = Physics2D.OverlapCircleAll(
-            entityAttackPoint != null ? entityAttackPoint.position : transform.position,
-            range, playerLayer);
+            entityAttackPoint != null
+                ? entityAttackPoint.position
+                : transform.position + new Vector3(transform.localScale.x < 0 ? 1.5f : -1.5f, 0f, 0f),
+            skill2Range, playerLayer);
         foreach (var h in hits)
         {
             Entity ent = h.GetComponent<Entity>();
@@ -412,154 +422,214 @@ public class BossAI : Entity
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // SKILL 3 — LAVA GASING (HP <= 50% ONLY)
-    // Boss berputar seperti gasing, mengeluarkan lava ke segala arah
+    // SKILL 3 — BALMOND-STYLE CYCLONE SWEEP (HANYA SAAT HP <= 50%)
+    // - Boss memutar pedang KE SAMPING (horizontal, elips mendatar di pinggang)
+    // - Badan boss IKUT BERGERAK mengejar player sambil muter (Balmond Skill 2)
+    // - Berlangsung selama 3.5 detik dengan damage bertubi-tubi + efek lava
     // ═════════════════════════════════════════════════════════════════════════
-    private IEnumerator LavaGasingRoutine()
+    private IEnumerator BalmondCycloneRoutine()
     {
         isAttacking = true;
         skill3Timer = skill3Cooldown;
-
         rb.velocity = Vector2.zero;
 
-        // ── WINDUP: Ancang-ancang sebelum gasing ─────────────────────────────
+        // ── Ancang-ancang singkat: Roar + Cahaya Merah Membara ───────────────
         if (roarSound != null && audioSource != null)
             audioSource.PlayOneShot(roarSound, 1.2f);
 
         if (anim != null) anim.SetTrigger("Roar");
 
-        float windupDur = 0.6f, we = 0f;
-        while (we < windupDur)
-        {
-            we += Time.deltaTime;
-            float t = we / windupDur;
-            if (sr != null) sr.color = Color.Lerp(originalColor, new Color(1.5f, 0.3f, 0.0f, 1f), t);
-            yield return null;
-        }
+        // Warna merah menyala 0.35s
+        yield return StartCoroutine(ColorPulse(new Color(1.6f, 0.2f, 0.0f, 1f), 0.35f));
 
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.3f, 0.25f);
+        if (player == null || isDead) { isAttacking = false; yield break; }
 
-        // ── SPIN: Berputar selama skill3SpinDuration detik ────────────────────
-        float spinElapsed   = 0f;
-        float spinAngle     = 0f;
-        float damageTickCd  = 0.35f;
+        // ── Buat Objek Cyclone Horizontal (Muter ke Samping di Pinggang Boss) ──
+        GameObject cycloneGO = new GameObject("Boss_Horizontal_Cyclone");
+        cycloneGO.transform.position = transform.position + new Vector3(0f, 0.2f, 0f);
+        SpriteRenderer cycloneSR = cycloneGO.AddComponent<SpriteRenderer>();
+        cycloneSR.sprite       = fxHorizontalCyclone != null ? fxHorizontalCyclone : fxWhirlwind;
+        cycloneSR.color        = new Color(1f, 0.5f, 0.1f, 0.95f);
+        cycloneSR.sortingOrder = 55; // Di atas karakter
+
+        Material cycloneMat = new Material(Shader.Find("Sprites/Default"));
+        cycloneMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        cycloneMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive Glow!
+        cycloneSR.material = cycloneMat;
+
+        // Skala horizontal: LEBAR ke samping (5.0f), TIPIK ke atas (1.4f) -> Balmond horizontal spin!
+        Vector3 cycloneBaseScale = new Vector3(5.0f, 1.4f, 1f);
+        cycloneGO.transform.localScale = cycloneBaseScale;
+
+        // ── Putaran Balmond: Berlangsung 3.5 Detik ────────────────────────────
+        float elapsed         = 0f;
         float damageTickTimer = 0f;
-        float lavaSpawnCd   = 0.18f;
-        float lavaTimer     = 0f;
+        float damageTickCd    = 0.28f; // Damage tiap 0.28 detik
+        float slashFxTimer    = 0f;
+        float slashFxCd       = 0.14f; // Ayunan tebasan horizontal tiap 0.14s
+        float afterimageTimer = 0f;
+        bool  slashFlip       = false;
 
-        HashSet<Entity> spinHitSet = new HashSet<Entity>();
+        if (anim != null) anim.SetBool("isMoving", true); // Kaki berjalan saat muter
 
-        while (spinElapsed < skill3SpinDuration)
+        while (elapsed < skill3Duration)
         {
-            spinElapsed   += Time.deltaTime;
-            spinAngle     += Time.deltaTime * 720f;      // 2 putaran per detik
+            if (isDead) break;
+
+            elapsed         += Time.deltaTime;
             damageTickTimer += Time.deltaTime;
-            lavaTimer       += Time.deltaTime;
+            slashFxTimer    += Time.deltaTime;
+            afterimageTimer += Time.deltaTime;
 
-            // Visual spin: rotasi dan warna berkedip
-            transform.rotation = Quaternion.Euler(0f, 0f, spinAngle);
-            if (sr != null)
+            // 1. BADAN BOS IKUT GERAK MENGEJAR PLAYER (Balmond skill 2 style!)
+            if (player != null)
             {
-                float pulse = (Mathf.Sin(spinElapsed * 25f) + 1f) * 0.5f;
-                sr.color = Color.Lerp(new Color(1.5f, 0.4f, 0.0f, 1f), new Color(1f, 0.1f, 0.0f, 1f), pulse);
+                float dirX = Mathf.Sign(player.position.x - transform.position.x);
+                float hDistance = Mathf.Abs(player.position.x - transform.position.x);
+
+                // Bergerak maju mengejar player
+                if (hDistance > 0.8f)
+                    rb.velocity = new Vector2(dirX * skill3ChaseSpeed, rb.velocity.y);
+                else
+                    rb.velocity = new Vector2(dirX * 2.0f, rb.velocity.y);
+
+                // Hadapkan badan ke arah player
+                float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
+                if (dirX > 0.1f)       transform.localScale = new Vector3(-s, s, 1f);
+                else if (dirX < -0.1f) transform.localScale = new Vector3(s,  s, 1f);
             }
 
-            // Cincin spin berputar di sekitar boss
-            if (lavaTimer >= lavaSpawnCd)
+            // Cyclone horizontal selalu mengikuti posisi pinggang bos
+            if (cycloneGO != null)
             {
-                lavaTimer = 0f;
-                float a = spinAngle * Mathf.Deg2Rad;
-                for (int i = 0; i < 4; i++)
-                {
-                    float ang = a + i * Mathf.PI * 0.5f;
-                    Vector3 lp = transform.position + new Vector3(
-                        Mathf.Cos(ang) * skill3SpinRadius * 0.7f,
-                        Mathf.Sin(ang) * skill3SpinRadius * 0.4f, 0f);
-
-                    SpawnFX(lp, fxLavaSplash, Vector3.one * Random.Range(0.6f, 1.0f),
-                            Random.Range(0f, 360f), 0.30f, new Color(1f, 0.3f, 0.0f, 0.85f));
-                }
-
-                // Cincin besar berputar
-                SpawnFX(transform.position, fxSpinRing, Vector3.one * (1.5f + Mathf.Sin(spinElapsed * 4f) * 0.3f),
-                        spinAngle, 0.22f, new Color(1f, 0.45f, 0.0f, 0.8f), true, 1.2f);
-
-                // Pool lava di bawah boss
-                SpawnFX(transform.position + Vector3.down * 0.5f, fxLavaPool,
-                        new Vector3(1.8f, 0.9f, 1f), 0f, 0.4f,
-                        new Color(1f, 0.2f, 0.0f, 0.7f), true, 1.1f);
+                cycloneGO.transform.position = transform.position + new Vector3(0f, 0.25f, 0f);
+                // Efek denyut membesar-mengecil sedikit saat memutar
+                float pulse = 1f + Mathf.Sin(elapsed * 16f) * 0.08f;
+                cycloneGO.transform.localScale = new Vector3(cycloneBaseScale.x * pulse, cycloneBaseScale.y * pulse, 1f);
             }
 
-            // Damage tick tiap 0.35 detik ke player dalam radius
+            // 2. MUTER KE SAMPING: Tebasan pedang horizontal bergantian kiri-kanan
+            if (slashFxTimer >= slashFxCd)
+            {
+                slashFxTimer = 0f;
+                slashFlip    = !slashFlip;
+
+                float faceDir = transform.localScale.x < 0 ? 1f : -1f;
+                float slashSide = slashFlip ? 1f : -1f;
+
+                // Ayunan tebasan horizontal membentang ke samping
+                Vector3 slashPos = transform.position + new Vector3(slashSide * 0.6f, 0.2f, 0f);
+                SpawnFX(slashPos,
+                        fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
+                        new Vector3(slashSide * 4.4f, 1.3f, 1f), // Mendatar ke samping!
+                        Random.Range(-8f, 8f),                  // Nyaris datar horizontal
+                        0.20f,
+                        new Color(1f, 0.65f, 0.15f, 0.95f));
+
+                // Suara tebasan berputar cepat
+                if (attackSound != null && audioSource != null && Random.value < 0.65f)
+                    audioSource.PlayOneShot(attackSound, 0.75f);
+
+                // Percikan lava terlempar ke samping kiri & kanan
+                Vector3 sparkPos = transform.position + new Vector3(slashSide * 2.2f, -0.3f, 0f);
+                SpawnFX(sparkPos, fxLavaSplash,
+                        new Vector3(Random.Range(0.6f, 0.9f), Random.Range(0.7f, 1.0f), 1f),
+                        slashSide * 30f, 0.35f,
+                        new Color(1f, 0.35f, 0.0f, 0.85f));
+            }
+
+            // Afterimage api di belakang badan bos
+            if (afterimageTimer >= 0.10f)
+            {
+                afterimageTimer = 0f;
+                SpawnAfterimage(new Color(1f, 0.3f, 0.0f, 0.6f));
+            }
+
+            // 3. MULTI-HIT DAMAGE: Setiap 0.28 detik, siapa pun dalam jangkauan kena tebasan!
             if (damageTickTimer >= damageTickCd)
             {
                 damageTickTimer = 0f;
-                spinHitSet.Clear(); // Reset set tiap tick agar bisa kena lagi
 
-                Collider2D[] nearTargets = Physics2D.OverlapCircleAll(transform.position, skill3SpinRadius, playerLayer);
-                foreach (var h in nearTargets)
+                Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, skill3Radius, playerLayer);
+                foreach (var h in hits)
                 {
                     Entity ent = h.GetComponent<Entity>();
-                    if (ent != null && !spinHitSet.Contains(ent))
+                    if (ent != null)
                     {
-                        spinHitSet.Add(ent);
-                        ent.TakeDamage(skill3SpinDamage, false);
+                        ent.TakeDamage(skill3SpinDmg, false);
+
+                        // Efek benturan pedang di badan player
+                        SpawnFX(ent.transform.position, fxSlashCross,
+                                Vector3.one * 1.0f, Random.Range(-30f, 30f),
+                                0.20f, Color.white);
                     }
                 }
 
-                // Screen shake kecil per tick
-                if (CameraFollow.instance != null)
-                    CameraFollow.instance.TriggerScreenShake(0.15f, 0.12f);
+                // Screen shake halus per hit
+                if (CameraFollow.instance != null && hits.Length > 0)
+                    CameraFollow.instance.TriggerScreenShake(0.14f, 0.15f);
             }
 
             yield return null;
         }
 
-        // ── BERHENTI: Ledakan lava akhir ──────────────────────────────────────
-        transform.rotation = Quaternion.identity;
-        if (sr != null) sr.color = originalColor;
+        // Hancurkan efek cyclone horizontal setelah selesai
+        if (cycloneGO != null) Destroy(cycloneGO);
 
-        // Ledakan lava besar di akhir spin
-        if (CameraFollow.instance != null)
-            CameraFollow.instance.TriggerScreenShake(0.55f, 0.45f);
+        rb.velocity = Vector2.zero;
+        if (anim != null) anim.SetBool("isMoving", false);
 
-        for (int i = 0; i < 8; i++)
+        // ── 4. FINISHER PUTARAN: Ayunan Terakhir Menyapu Bersih ────────────────
+        if (!isDead)
         {
-            float ang = i * Mathf.PI * 0.25f;
-            Vector3 bpos = transform.position + new Vector3(
-                Mathf.Cos(ang) * 2.5f, Mathf.Sin(ang) * 1.5f, 0f);
-            SpawnFX(bpos, fxLavaSplash, Vector3.one * Random.Range(1.0f, 1.5f),
-                    ang * Mathf.Rad2Deg, 0.6f, new Color(1f, 0.35f, 0.0f, 1f), true, 1.3f);
-        }
-        SpawnFX(transform.position, fxLavaPool, new Vector3(3.5f, 2.0f, 1f),
-                0f, 1.5f, new Color(1f, 0.25f, 0.0f, 0.9f), true, 1.1f);
+            if (attackSound != null && audioSource != null)
+                audioSource.PlayOneShot(attackSound, 1.3f);
 
-        // Damage ledakan akhir
-        Collider2D[] finalHits = Physics2D.OverlapCircleAll(transform.position, skill3SpinRadius + 1f, playerLayer);
-        foreach (var h in finalHits)
-        {
-            Entity ent = h.GetComponent<Entity>();
-            if (ent != null) ent.TakeDamage(skill3SpinDamage * 3, true);
+            if (CameraFollow.instance != null)
+                CameraFollow.instance.TriggerScreenShake(0.45f, 0.38f);
+
+            // Tebasan horizontal besar terakhir ke kedua sisi
+            SpawnFX(transform.position + new Vector3(0f, 0.2f, 0f),
+                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
+                    new Vector3(5.5f, 1.6f, 1f), 0f, 0.35f,
+                    new Color(1f, 0.85f, 0.3f, 1f));
+            SpawnFX(transform.position + new Vector3(0f, 0.2f, 0f),
+                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
+                    new Vector3(-5.5f, 1.6f, 1f), 0f, 0.35f,
+                    new Color(1f, 0.85f, 0.3f, 1f));
+
+            // Kolam lava di tanah di bawah bos
+            Vector3 groundPos = new Vector3(transform.position.x, transform.position.y - 0.55f, 0f);
+            SpawnFX(groundPos, fxLavaPool, new Vector3(3.0f, 1.1f, 1f), 0f, 1.8f,
+                    new Color(1f, 0.25f, 0.0f, 0.85f), true, 1.1f);
+
+            // Damage akhir + knockback terpental
+            Collider2D[] finalHits = Physics2D.OverlapCircleAll(transform.position, skill3Radius + 0.5f, playerLayer);
+            foreach (var h in finalHits)
+            {
+                Entity ent = h.GetComponent<Entity>();
+                if (ent != null) ent.TakeDamage(skill3SpinDmg * 2, true);
+            }
         }
 
-        yield return new WaitForSeconds(0.4f);
+        yield return new WaitForSeconds(0.35f);
         isAttacking = false;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // UNLOCK SKILL 3 FLASH (efek visual peringatan)
+    // UNLOCK SKILL 3 WARNING (Flash merah saat HP <= 50%)
     // ─────────────────────────────────────────────────────────────────────────
-    private IEnumerator UnlockSkill3Flash()
+    private IEnumerator Skill3UnlockWarning()
     {
-        // 3x kilat merah-oranye sebagai tanda bahaya
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
-            if (sr != null) sr.color = new Color(1.8f, 0.3f, 0.0f, 1f);
-            yield return new WaitForSeconds(0.12f);
-            if (sr != null) sr.color = originalColor;
+            if (sr != null) sr.color = new Color(1.6f, 0.2f, 0.0f, 1f);
             yield return new WaitForSeconds(0.10f);
+            if (sr != null) sr.color = originalColor;
+            yield return new WaitForSeconds(0.09f);
         }
+        if (roarSound != null && audioSource != null)
+            audioSource.PlayOneShot(roarSound, 1.0f);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -581,7 +651,6 @@ public class BossAI : Entity
         {
             isTakingDamage = true;
             isAttacking    = false;
-            if (attackTimeoutCoroutine != null) StopCoroutine(attackTimeoutCoroutine);
             if (anim != null) anim.SetTrigger("Hit");
             StartCoroutine(HitRoutine());
         }
@@ -618,30 +687,28 @@ public class BossAI : Entity
     {
         if (isDead) return;
         isDead = true;
-
         StopAllCoroutines();
         transform.rotation = Quaternion.identity;
-        Time.timeScale     = 1.0f;
-        isAttacking    = false;
-        isKnocked      = false;
-        isTakingDamage = false;
+        Time.timeScale  = 1.0f;
+        isAttacking     = false;
+        isKnocked       = false;
+        isTakingDamage  = false;
 
         if (audioSource != null && deathSound != null)
             audioSource.PlayOneShot(deathSound);
-
         if (anim != null) anim.SetTrigger("Die");
-        if (rb != null) { rb.velocity = Vector2.zero; rb.simulated = false; }
+        if (rb   != null) { rb.velocity = Vector2.zero; rb.simulated = false; }
         if (bossHealthBar != null) bossHealthBar.gameObject.SetActive(false);
 
-        StartCoroutine(MunculkanVictoryPanel());
+        StartCoroutine(MunculkanVictory());
         Destroy(gameObject, 5f);
     }
 
-    private IEnumerator MunculkanVictoryPanel()
+    private IEnumerator MunculkanVictory()
     {
         yield return new WaitForSecondsRealtime(2f);
         VictoryManager vm = FindObjectOfType<VictoryManager>(true);
-        Player ps = FindObjectOfType<Player>();
+        Player ps         = FindObjectOfType<Player>();
         if (vm != null) vm.MunculkanMenang(ps != null ? ps.waktuMain : 999f);
     }
 
@@ -654,17 +721,12 @@ public class BossAI : Entity
         if (bossHealthBar != null) bossHealthBar.value = currentHealth;
     }
 
-    public void EndAttack()
-    {
-        isAttacking = false;
-        if (attackTimeoutCoroutine != null) StopCoroutine(attackTimeoutCoroutine);
-    }
+    public void EndAttack() => isAttacking = false;
 
     public void DealDamage()
     {
-        // Dipanggil dari Animation Event (Cleave)
         if (!isActiveAndEnabled || (UI.instance != null && UI.instance.isGameOver)) return;
-        DealSlashDamage(skill2SlashDamage, false);
+        HitMelee(skill2SlashDmg, false);
     }
 
     public void PlayRoar()
@@ -673,18 +735,17 @@ public class BossAI : Entity
         if (anim != null) { anim.ResetTrigger("Roar"); anim.SetTrigger("Roar"); }
         if (audioSource != null && roarSound != null)
             audioSource.PlayOneShot(roarSound, 1.3f);
-
         if (player != null)
         {
             float d = player.position.x - transform.position.x;
             float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
-            if (d > 0.1f)       transform.localScale = new Vector3(-s, s, 1f);
-            else if (d < -0.1f) transform.localScale = new Vector3(s, s, 1f);
+            if (d >  0.1f) transform.localScale = new Vector3(-s, s, 1f);
+            if (d < -0.1f) transform.localScale = new Vector3(s,  s, 1f);
         }
-        StartCoroutine(RoarEffectRoutine());
+        StartCoroutine(RoarEffect());
     }
 
-    private IEnumerator RoarEffectRoutine()
+    private IEnumerator RoarEffect()
     {
         if (sr != null)
         {
@@ -692,16 +753,16 @@ public class BossAI : Entity
             while (e < 1.8f)
             {
                 e += Time.deltaTime;
-                float pulse = (Mathf.Sin(e * 14f) + 1f) * 0.5f;
-                sr.color = Color.Lerp(originalColor, new Color(1.8f, 0.25f, 0.15f, 1f), 0.35f + pulse * 0.65f);
+                float p = (Mathf.Sin(e * 14f) + 1f) * 0.5f;
+                sr.color = Color.Lerp(originalColor, new Color(1.8f, 0.25f, 0.15f, 1f), 0.35f + p * 0.65f);
                 yield return null;
             }
             sr.color = originalColor;
         }
-        if (bossHealthBar != null) StartCoroutine(AnimateHealthBarFill());
+        if (bossHealthBar != null) StartCoroutine(AnimateBar());
     }
 
-    private IEnumerator AnimateHealthBarFill()
+    private IEnumerator AnimateBar()
     {
         if (bossHealthBar == null) yield break;
         bossHealthBar.maxValue = maxHealth;
@@ -725,11 +786,11 @@ public class BossAI : Entity
         frozenOnGameOver = true;
         StopAllCoroutines();
         transform.rotation = Quaternion.identity;
-        Time.timeScale  = 1.0f;
-        isAttacking     = false;
-        isKnocked       = false;
-        canMove         = false;
-        if (rb  != null) { rb.velocity = Vector2.zero; rb.simulated = false; }
+        Time.timeScale = 1.0f;
+        isAttacking = false;
+        isKnocked   = false;
+        canMove     = false;
+        if (rb   != null) { rb.velocity = Vector2.zero; rb.simulated = false; }
         if (anim != null) anim.enabled = false;
         enabled = false;
     }
@@ -739,8 +800,8 @@ public class BossAI : Entity
         if (isAttacking || player == null) return;
         float d = player.position.x - transform.position.x;
         float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
-        if (d > 0.1f)       transform.localScale = new Vector3(-s, s, 1f);
-        else if (d < -0.1f) transform.localScale = new Vector3(s, s, 1f);
+        if (d >  0.1f) transform.localScale = new Vector3(-s, s, 1f);
+        if (d < -0.1f) transform.localScale = new Vector3(s,  s, 1f);
     }
 
     private void MoveToPlayer(float dir)
@@ -756,11 +817,31 @@ public class BossAI : Entity
         if (anim != null) anim.SetBool("isMoving", false);
     }
 
+    private IEnumerator ColorPulse(Color targetColor, float duration)
+    {
+        if (sr == null) { yield return new WaitForSeconds(duration); yield break; }
+        float e = 0f;
+        while (e < duration * 0.5f)
+        {
+            e += Time.deltaTime;
+            sr.color = Color.Lerp(originalColor, targetColor, e / (duration * 0.5f));
+            yield return null;
+        }
+        e = 0f;
+        while (e < duration * 0.5f)
+        {
+            e += Time.deltaTime;
+            sr.color = Color.Lerp(targetColor, originalColor, e / (duration * 0.5f));
+            yield return null;
+        }
+        sr.color = originalColor;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
-    // VISUAL FX SPAWNER
+    // FX SPAWNER
     // ─────────────────────────────────────────────────────────────────────────
     private void SpawnFX(Vector3 pos, Sprite sprite, Vector3 scale, float rotZ,
-                         float duration, Color color, bool expand = false, float endMul = 1.3f)
+                         float duration, Color color, bool expand = false, float endMul = 1.2f)
     {
         if (sprite == null) return;
 
@@ -769,34 +850,32 @@ public class BossAI : Entity
         go.transform.rotation   = Quaternion.Euler(0, 0, rotZ);
         go.transform.localScale = scale;
 
-        SpriteRenderer sr2 = go.AddComponent<SpriteRenderer>();
-        sr2.sprite       = sprite;
-        sr2.color        = color;
-        sr2.sortingOrder = 50;
+        SpriteRenderer s2 = go.AddComponent<SpriteRenderer>();
+        s2.sprite       = sprite;
+        s2.color        = color;
+        s2.sortingOrder = 50;
 
         Material mat = new Material(Shader.Find("Sprites/Default"));
         mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive
-        sr2.material = mat;
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive Glow
+        s2.material = mat;
 
-        Vector3 targetScale = expand ? scale * endMul : scale * 1.1f;
-        StartCoroutine(FadeFX(go, sr2, targetScale, duration));
+        StartCoroutine(FadeFX(go, s2, expand ? scale * endMul : scale * 1.08f, duration));
     }
 
-    private IEnumerator FadeFX(GameObject go, SpriteRenderer sr2, Vector3 targetScale, float dur)
+    private IEnumerator FadeFX(GameObject go, SpriteRenderer s2, Vector3 targetScale, float dur)
     {
         if (go == null) yield break;
-        Vector3 startScale = go.transform.localScale;
-        Color   startCol   = sr2.color;
-        float   elapsed    = 0f;
-        while (elapsed < dur)
+        Vector3 s0  = go.transform.localScale;
+        Color   c0  = s2.color;
+        float   el  = 0f;
+        while (el < dur)
         {
             if (go == null) yield break;
-            elapsed += Time.deltaTime;
-            float t = elapsed / dur;
-            go.transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-            sr2.color = new Color(startCol.r, startCol.g, startCol.b,
-                                  Mathf.Lerp(startCol.a, 0f, t));
+            el += Time.deltaTime;
+            float t = el / dur;
+            go.transform.localScale = Vector3.Lerp(s0, targetScale, t);
+            s2.color = new Color(c0.r, c0.g, c0.b, Mathf.Lerp(c0.a, 0f, t));
             yield return null;
         }
         if (go != null) Destroy(go);
@@ -809,22 +888,20 @@ public class BossAI : Entity
         ghost.transform.position   = sr.transform.position;
         ghost.transform.rotation   = sr.transform.rotation;
         ghost.transform.localScale = sr.transform.lossyScale;
-        SpriteRenderer gsr = ghost.AddComponent<SpriteRenderer>();
-        gsr.sprite       = sr.sprite;
-        gsr.flipX        = sr.flipX;
-        gsr.color        = tint;
-        gsr.sortingOrder = sr.sortingOrder - 1;
-        StartCoroutine(FadeFX(ghost, gsr, ghost.transform.localScale, 0.25f));
+        SpriteRenderer g = ghost.AddComponent<SpriteRenderer>();
+        g.sprite       = sr.sprite;
+        g.flipX        = sr.flipX;
+        g.color        = tint;
+        g.sortingOrder = sr.sortingOrder - 1;
+        StartCoroutine(FadeFX(ghost, g, ghost.transform.localScale, 0.22f));
     }
 
     void OnDrawGizmosSelected()
     {
+        Gizmos.color = Color.red;
         if (entityAttackPoint != null)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(entityAttackPoint.position, skill2AttackRange);
-        }
+            Gizmos.DrawWireSphere(entityAttackPoint.position, skill2Range);
         Gizmos.color = new Color(1f, 0.4f, 0f, 0.3f);
-        Gizmos.DrawWireSphere(transform.position, skill3SpinRadius);
+        Gizmos.DrawWireSphere(transform.position, skill3Radius);
     }
 }
