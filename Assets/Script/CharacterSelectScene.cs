@@ -6,8 +6,11 @@ using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// CharacterSelectScene — Mengelola pemilihan karakter (minimal 2 karakter: Kaelen & Valeria)
-/// lengkap dengan peragaan status, deskripsi 3 skill pedang sakti [A], [S], [W], dan transisi ke gameplay.
+/// CharacterSelectScene — Scene Pemilihan Karakter Dark Fantasy BATH:
+/// - Kolom Kiri: Spotlight Karakter (Idle Portrait dengan animasi napas/bob, Nama, Role, Status, Lore).
+/// - Kolom Kanan: Showcase 3 Skill [A], [S], [W] lengkap dengan IKON grafis, cooldown, dan deskripsi detail.
+/// - Navigasi Pindah Karakter: Tombol Panah [ ◄ ] dan [ ► ] (bisa juga via Keyboard Panah Kiri/Kanan).
+/// - Tombol Bawah: Kembali ke Stage & Konfirmasi Mainkan.
 /// </summary>
 public class CharacterSelectScene : MonoBehaviour
 {
@@ -16,67 +19,92 @@ public class CharacterSelectScene : MonoBehaviour
     private Sprite btnFantasyNormal;
     private Sprite btnFantasyHover;
     private Sprite btnFantasyPressed;
-    private Sprite portraitKaelen;
-    private Sprite portraitValeria;
     private Sprite screenVignette;
     private TMP_FontAsset tmpFont;
+
+    // Portraits
+    private Sprite portraitKaelen;
+    private Sprite portraitValeria;
+
+    // Skill Icons
+    private Sprite iconKaelenThrust;
+    private Sprite iconKaelenCyclone;
+    private Sprite iconKaelenUlt;
+    private Sprite iconValeriaFang;
+    private Sprite iconValeriaVortex;
+    private Sprite iconValeriaWrath;
+
     private AudioClip sfxClick;
-    private AudioClip sfxSelect;
+    private AudioClip sfxSwitch;
     private AudioSource audioSource;
 
-    // ── UI Refs ───────────────────────────────────────────────────────────
+    // ── UI References ────────────────────────────────────────────────────
     private Canvas canvas;
-    private GameObject[] characterCards;
-    private Image[] cardBorderHighlights;
-    private TMP_Text[] txtCardSelectionBadges;
 
-    // Detail Panel Refs
-    private TMP_Text txtSelectedHeroName;
-    private TMP_Text txtSelectedHeroTitle;
-    private TMP_Text txtSelectedHeroDesc;
-    private TMP_Text txtStatHP;
-    private TMP_Text txtStatATK;
-    private TMP_Text txtStatSPD;
+    // Kolom Kiri: Character Spotlight
+    private RectTransform leftPanelRT;
+    private Image imgCharacterPortrait;
+    private RectTransform portraitRT;
+    private TMP_Text txtHeroName;
+    private TMP_Text txtHeroTitle;
+    private TMP_Text txtHeroRole;
+    private TMP_Text txtHeroLore;
+    private TMP_Text txtHeroStats;
+    private TMP_Text txtPageIndicator;
 
-    // Skill Boxes Refs
-    private TMP_Text txtSkill1Title;
+    // Kolom Kanan: Skill Showcase
+    private Image imgSkill1Icon;
+    private TMP_Text txtSkill1Header;
     private TMP_Text txtSkill1Desc;
-    private TMP_Text txtSkill2Title;
+
+    private Image imgSkill2Icon;
+    private TMP_Text txtSkill2Header;
     private TMP_Text txtSkill2Desc;
-    private TMP_Text txtSkill3Title;
+
+    private Image imgSkill3Icon;
+    private TMP_Text txtSkill3Header;
     private TMP_Text txtSkill3Desc;
 
-    private Button btnConfirmPlay;
-    private TMP_Text txtConfirmBtnLabel;
+    // Tombol Konfirmasi Bawah
+    private TMP_Text txtPlayBtnLabel;
 
-    // ── Data Karakter ─────────────────────────────────────────────────────
-    private class CharacterData
+    // ── Data Struktur Karakter ───────────────────────────────────────────
+    private class CharacterEntry
     {
         public string name;
         public string title;
         public string role;
         public string lore;
         public Sprite portrait;
-        public string statHP;
-        public string statATK;
-        public string statSPD;
         public Color themeColor;
 
+        // Stats
+        public string statHP;
+        public string statATK;
+        public string statDEF;
+        public string statSPD;
+
         // Skill 1 [A]
-        public string skill1Name;
+        public string skill1Title;
+        public string skill1Cooldown;
         public string skill1Desc;
+        public Sprite skill1Icon;
 
         // Skill 2 [S]
-        public string skill2Name;
+        public string skill2Title;
+        public string skill2Cooldown;
         public string skill2Desc;
+        public Sprite skill2Icon;
 
         // Skill 3 [W] (Ultimate)
-        public string skill3Name;
+        public string skill3Title;
+        public string skill3Cooldown;
         public string skill3Desc;
+        public Sprite skill3Icon;
     }
 
-    private CharacterData[] characters;
-    private int selectedIndex = 0;
+    private CharacterEntry[] characters;
+    private int currentIndex = 0;
     private string targetScene = "Next";
 
     private void Awake()
@@ -88,7 +116,8 @@ public class CharacterSelectScene : MonoBehaviour
         InitCharacterData();
 
         targetScene = PlayerPrefs.GetString("TargetSceneName", "Next");
-        selectedIndex = PlayerPrefs.GetInt("SelectedCharacterID", 0);
+        currentIndex = PlayerPrefs.GetInt("SelectedCharacterID", 0);
+        if (currentIndex < 0 || currentIndex >= characters.Length) currentIndex = 0;
     }
 
     private void LoadAssets()
@@ -103,64 +132,100 @@ public class CharacterSelectScene : MonoBehaviour
         portraitKaelen     = Resources.Load<Sprite>("UI/hud_player_portrait");
         portraitValeria    = Resources.Load<Sprite>("UI/hud_valeria_portrait");
 
+        // Skill Icons
+        iconKaelenThrust   = Resources.Load<Sprite>("UI/skill_icon_thrust");
+        iconKaelenCyclone  = Resources.Load<Sprite>("UI/skill_icon_cyclone");
+        iconKaelenUlt      = Resources.Load<Sprite>("UI/skill_icon_ultimate");
+
+        iconValeriaFang    = Resources.Load<Sprite>("UI/skill_valeria_fang");
+        iconValeriaVortex  = Resources.Load<Sprite>("UI/skill_valeria_vortex");
+        iconValeriaWrath   = Resources.Load<Sprite>("UI/skill_valeria_wrath");
+
         sfxClick           = Resources.Load<AudioClip>("Audio/ui_click");
-        sfxSelect          = Resources.Load<AudioClip>("Audio/star_1");
-        if (sfxSelect == null) sfxSelect = sfxClick;
+        sfxSwitch          = Resources.Load<AudioClip>("Audio/star_1");
+        if (sfxSwitch == null) sfxSwitch = sfxClick;
     }
 
     private void InitCharacterData()
     {
-        characters = new CharacterData[]
+        characters = new CharacterEntry[]
         {
-            // ── Karakter 1: KAELEN ──────────────────────────────────────────
-            new CharacterData
+            // ── 1. KAELEN (The Shadow Blader) ────────────────────────────────
+            new CharacterEntry
             {
                 name = "KAELEN",
                 title = "THE SHADOW BLADER",
                 role = "⚔ BLADE STRIKER / BALANCED",
-                lore = "Ksatria pengembara pembawa pedang api suci & bayangan. Menguasai tebasan kilat terobos dan badai pedang pelindung.",
+                lore = "Ksatria berpedang api suci yang menjelajahi sisa-sisa reruntuhan masa lalu. Memadukan kecepatan tebasan kilat dengan ketahanan bertarung yang kokoh.",
                 portrait = portraitKaelen,
-                statHP  = "★★★★☆ (100 HP)",
-                statATK = "★★★★☆ (SEIMBANG & KUAT)",
-                statSPD = "★★★☆☆ (LINCAH)",
-                themeColor = new Color(0.30f, 0.85f, 1.0f, 1f),
+                themeColor = new Color(0.35f, 0.85f, 1.0f, 1f),
 
-                skill1Name = "[A]  PHANTOM THRUST",
-                skill1Desc = "Menerobos kilat menusuk barisan musuh dengan bilah pedang emas berapi (Cooldown: 2.2s).",
+                statHP  = "★★★★☆ (100)",
+                statATK = "★★★★☆ (85)",
+                statDEF = "★★★★☆ (80)",
+                statSPD = "★★★☆☆ (75)",
 
-                skill2Name = "[S]  CYCLONE CRESCENT",
-                skill2Desc = "Memutar pedang 360° menciptakan badai sabit emas yang melibas dan memukul mundur musuh (Cooldown: 4.5s).",
+                skill1Title = "SKILL 1 [A] — PHANTOM THRUST",
+                skill1Cooldown = "Cooldown: 2.2s  |  Biaya: 12 MP",
+                skill1Desc = "Menerobos secepat kilat ke depan dengan bilah pedang emas berapi, menembus dan melukai seluruh musuh di jalurnya.",
+                skill1Icon = iconKaelenThrust,
 
-                skill3Name = "[W]  JUDGEMENT OF THE END  (ULTIMATE)",
-                skill3Desc = "Menghentikan waktu sesaat dan memanggil badai seribu pedang dimensi yang menghancurkan seluruh arena (Cooldown: 9.0s)."
+                skill2Title = "SKILL 2 [S] — CYCLONE CRESCENT",
+                skill2Cooldown = "Cooldown: 4.5s  |  Biaya: 22 MP",
+                skill2Desc = "Memutar tubuh dan pedang 360 derajat menciptakan badai sabit emas yang menyapu area dan memukul mundur musuh di sekitar.",
+                skill2Icon = iconKaelenCyclone,
+
+                skill3Title = "ULTIMATE [W] — JUDGEMENT OF THE END",
+                skill3Cooldown = "Cooldown: 9.0s  |  Biaya: 40 MP",
+                skill3Desc = "Menghentikan aliran waktu sesaat, lalu memanggil hujan badai seribu pedang dimensi yang meluluhlantakkan seisi medan laga!",
+                skill3Icon = iconKaelenUlt
             },
 
-            // ── Karakter 2: VALERIA ─────────────────────────────────────────
-            new CharacterData
+            // ── 2. VALERIA (The Scarlet Valkyrie) ───────────────────────────
+            new CharacterEntry
             {
                 name = "VALERIA",
                 title = "THE SCARLET VALKYRIE",
-                role = "🗡 CRIMSON ASSASSIN / HIGH DPS",
-                lore = "Pendekar wanita pembantai berkecepatan tinggi dari klan Crimson. Menghabisi musuh sebelum mereka sempat bereaksi.",
+                role = "🗡 CRIMSON ASSASSIN / BURST DPS",
+                lore = "Pendekar wanita bertaring bayangan dari ordo Crimson. Menggunakan sepasang belati darah berkecepatan tinggi yang mampu menghabisi musuh dalam kedipan mata.",
                 portrait = portraitValeria,
-                statHP  = "★★★☆☆ (85 HP)",
-                statATK = "★★★★★ (BURST SANGAT TINGGI)",
-                statSPD = "★★★★★ (SANGAT KILAT)",
-                themeColor = new Color(1.0f, 0.35f, 0.35f, 1f),
+                themeColor = new Color(1.0f, 0.40f, 0.40f, 1f),
 
-                skill1Name = "[A]  CRIMSON FANG",
-                skill1Desc = "Dash bayangan merah menyayat lawan dengan cepat dan menyedot darah musuh untuk memulihkan sebagian HP (Cooldown: 2.0s).",
+                statHP  = "★★★☆☆ (85)",
+                statATK = "★★★★★ (98)",
+                statDEF = "★★★☆☆ (70)",
+                statSPD = "★★★★★ (95)",
 
-                skill2Name = "[S]  SCARLET VORTEX",
-                skill2Desc = "Pusaran pisau ganda api merah neraka yang menarik musuh ke pusaran dan membakar mereka (Cooldown: 4.0s).",
+                skill1Title = "SKILL 1 [A] — CRIMSON FANG",
+                skill1Cooldown = "Cooldown: 2.0s  |  Biaya: 10 MP",
+                skill1Desc = "Dash bayangan merah menyayat musuh dengan luka dalam dan menyedot darah lawan untuk memulihkan sebagian HP ksatria.",
+                skill1Icon = iconValeriaFang,
 
-                skill3Name = "[W]  WRATH OF THE VALKYRIE  (ULTIMATE)",
-                skill3Desc = "Membuka sayap api crimson, menukik tajam dari udara dan memicu ledakan magma darah raksasa! (Cooldown: 8.5s)."
+                skill2Title = "SKILL 2 [S] — SCARLET VORTEX",
+                skill2Cooldown = "Cooldown: 4.0s  |  Biaya: 20 MP",
+                skill2Desc = "Putaran pusaran pisau ganda api merah neraka yang menarik musuh ke tengah pusaran dan membakar mereka secara beruntun.",
+                skill2Icon = iconValeriaVortex,
+
+                skill3Title = "ULTIMATE [W] — WRATH OF THE VALKYRIE",
+                skill3Cooldown = "Cooldown: 8.5s  |  Biaya: 38 MP",
+                skill3Desc = "Mengepakkan sayap api crimson ke angkasa, menukik tajam dari udara dan memicu ledakan magma darah raksasa berdaya hancur dahsyat!",
+                skill3Icon = iconValeriaWrath
             }
         };
     }
 
     private void Start()
+    {
+        FindCanvas();
+        BuildAtmosphere();
+        BuildHeader();
+        BuildTwoColumnLayout();
+        BuildBottomControls();
+
+        UpdateCharacterDisplay(false);
+    }
+
+    private void FindCanvas()
     {
         canvas = FindObjectOfType<Canvas>();
         if (canvas == null)
@@ -177,10 +242,6 @@ public class CharacterSelectScene : MonoBehaviour
 
             cgo.AddComponent<GraphicRaycaster>();
         }
-
-        BuildAtmosphere();
-        BuildUI();
-        SelectCharacter(selectedIndex, false);
     }
 
     private void BuildAtmosphere()
@@ -210,46 +271,31 @@ public class CharacterSelectScene : MonoBehaviour
 
             Image vi = vigGO.AddComponent<Image>();
             vi.sprite = screenVignette;
-            vi.color  = new Color(1f, 1f, 1f, 0.70f);
+            vi.color  = new Color(1f, 1f, 1f, 0.75f);
             vi.raycastTarget = false;
         }
     }
 
-    private void BuildUI()
+    private void BuildHeader()
     {
-        // Header Banner
-        BuildHeaderBanner();
+        GameObject header = new GameObject("HeaderPanel");
+        header.transform.SetParent(canvas.transform, false);
 
-        // 2 Kartu Karakter di sebelah kiri (Kaelen & Valeria)
-        BuildCharacterCards();
-
-        // Panel Detail Status & Deskripsi 3 Skill di sebelah kanan
-        BuildSkillDetailPanel();
-
-        // Tombol Navigasi Bawah
-        BuildBottomActionButtons();
-    }
-
-    private void BuildHeaderBanner()
-    {
-        GameObject banner = new GameObject("HeaderBanner");
-        banner.transform.SetParent(canvas.transform, false);
-
-        RectTransform rt = banner.AddComponent<RectTransform>();
+        RectTransform rt = header.AddComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 1f);
         rt.anchorMax = new Vector2(0.5f, 1f);
         rt.pivot     = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = new Vector2(0f, -25f);
-        rt.sizeDelta = new Vector2(760f, 75f);
+        rt.anchoredPosition = new Vector2(0f, -22f);
+        rt.sizeDelta = new Vector2(900f, 68f);
 
-        Image bImg = banner.AddComponent<Image>();
-        bImg.color = new Color(0.08f, 0.05f, 0.16f, 0.92f);
-        if (modalPanelSprite != null) { bImg.sprite = modalPanelSprite; bImg.type = Image.Type.Sliced; }
+        Image img = header.AddComponent<Image>();
+        img.color = new Color(0.08f, 0.05f, 0.16f, 0.94f);
+        if (modalPanelSprite != null) { img.sprite = modalPanelSprite; img.type = Image.Type.Sliced; }
 
-        CreateGoldDivider(banner.transform, 1f, 0f);
-        CreateGoldDivider(banner.transform, 0f, 0f);
+        CreateGoldDivider(header.transform, 1f, 0f);
+        CreateGoldDivider(header.transform, 0f, 0f);
 
-        TMP_Text title = CreateTMP(banner.transform, "Title", 30f, FontStyles.Bold,
+        TMP_Text title = CreateTMP(header.transform, "Title", 28f, FontStyles.Bold,
             new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
         title.rectTransform.anchorMin = Vector2.zero; title.rectTransform.anchorMax = Vector2.one;
         title.rectTransform.offsetMin = Vector2.zero; title.rectTransform.offsetMax = Vector2.zero;
@@ -257,312 +303,333 @@ public class CharacterSelectScene : MonoBehaviour
         title.text = "✦  PILIH KESATRIA ANDA  ✦";
     }
 
-    private void BuildCharacterCards()
+    // ─────────────────────────────────────────────────────────────────────
+    // TWO-COLUMN MAIN LAYOUT (Kiri: Idle Spotlight | Kanan: Skill Showcase)
+    // ─────────────────────────────────────────────────────────────────────
+    private void BuildTwoColumnLayout()
     {
-        characterCards = new GameObject[characters.Length];
-        cardBorderHighlights = new Image[characters.Length];
-        txtCardSelectionBadges = new TMP_Text[characters.Length];
+        // ── KOLOM KIRI: CHARACTER SPOTLIGHT (Lebar: 480, Tinggi: 540) ────────
+        GameObject leftCol = new GameObject("Col_Left_Spotlight");
+        leftCol.transform.SetParent(canvas.transform, false);
 
-        float startX = -460f;
-        float cardWidth = 300f;
-        float cardHeight = 460f;
-        float gap = 30f;
+        leftPanelRT = leftCol.AddComponent<RectTransform>();
+        leftPanelRT.anchorMin = new Vector2(0.5f, 0.5f);
+        leftPanelRT.anchorMax = new Vector2(0.5f, 0.5f);
+        leftPanelRT.pivot     = new Vector2(0.5f, 0.5f);
+        leftPanelRT.anchoredPosition = new Vector2(-360f, 25f);
+        leftPanelRT.sizeDelta = new Vector2(480f, 540f);
 
-        for (int i = 0; i < characters.Length; i++)
-        {
-            int idx = i;
-            CharacterData data = characters[i];
+        Image leftBg = leftCol.AddComponent<Image>();
+        if (modalPanelSprite != null) { leftBg.sprite = modalPanelSprite; leftBg.type = Image.Type.Sliced; }
+        leftBg.color = new Color(1f, 1f, 1f, 0.98f);
 
-            GameObject card = new GameObject("Card_" + data.name);
-            card.transform.SetParent(canvas.transform, false);
-            characterCards[i] = card;
+        CreateGoldDivider(leftCol.transform, 1f, 0f);
+        CreateGoldDivider(leftCol.transform, 0f, 0f);
 
-            RectTransform crt = card.AddComponent<RectTransform>();
-            crt.anchorMin = new Vector2(0.5f, 0.5f);
-            crt.anchorMax = new Vector2(0.5f, 0.5f);
-            crt.pivot     = new Vector2(0.5f, 0.5f);
-            crt.anchoredPosition = new Vector2(startX + i * (cardWidth + gap), 30f);
-            crt.sizeDelta = new Vector2(cardWidth, cardHeight);
+        // Tombol Panah KIRI [ ◄ ] & KANAN [ ► ] untuk ganti karakter
+        BuildCarouselArrows(leftCol.transform);
 
-            Image cardBg = card.AddComponent<Image>();
-            if (modalPanelSprite != null)
-            {
-                cardBg.sprite = modalPanelSprite;
-                cardBg.type = Image.Type.Sliced;
-                cardBg.color = new Color(1f, 1f, 1f, 0.96f);
-            }
-            else
-            {
-                cardBg.color = new Color(0.10f, 0.07f, 0.20f, 0.95f);
-            }
+        // Portrait Karakter (Idle Figure) di tengah-atas kolom kiri
+        GameObject portGO = new GameObject("HeroPortrait");
+        portGO.transform.SetParent(leftCol.transform, false);
+        portraitRT = portGO.AddComponent<RectTransform>();
+        portraitRT.anchorMin = new Vector2(0.5f, 1f);
+        portraitRT.anchorMax = new Vector2(0.5f, 1f);
+        portraitRT.pivot     = new Vector2(0.5f, 1f);
+        portraitRT.anchoredPosition = new Vector2(0f, -40f);
+        portraitRT.sizeDelta = new Vector2(170f, 170f);
 
-            // Card Highlight Border (Glow saat terpilih)
-            GameObject borderGO = new GameObject("SelectionGlow");
-            borderGO.transform.SetParent(card.transform, false);
-            RectTransform brt = borderGO.AddComponent<RectTransform>();
-            brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one;
-            brt.offsetMin = new Vector2(-4f, -4f); brt.offsetMax = new Vector2(4f, 4f);
-            Image borderImg = borderGO.AddComponent<Image>();
-            borderImg.color = new Color(1f, 0.85f, 0.35f, 0f);
-            borderImg.raycastTarget = false;
-            cardBorderHighlights[i] = borderImg;
+        imgCharacterPortrait = portGO.AddComponent<Image>();
+        imgCharacterPortrait.color = Color.white;
 
-            // Character Portrait
-            GameObject portGO = new GameObject("Portrait");
-            portGO.transform.SetParent(card.transform, false);
-            RectTransform prt = portGO.AddComponent<RectTransform>();
-            prt.anchorMin = new Vector2(0.5f, 1f); prt.anchorMax = new Vector2(0.5f, 1f);
-            prt.pivot     = new Vector2(0.5f, 1f);
-            prt.anchoredPosition = new Vector2(0f, -25f);
-            prt.sizeDelta = new Vector2(170f, 170f);
+        // Nama Karakter (Besar)
+        txtHeroName = CreateTMP(leftCol.transform, "HeroName", 28f, FontStyles.Bold,
+            new Color(0.35f, 0.85f, 1.0f, 1f), TextAlignmentOptions.Center);
+        txtHeroName.characterSpacing = 3f;
+        RectTransform hnRT = txtHeroName.rectTransform;
+        hnRT.anchorMin = new Vector2(0f, 1f); hnRT.anchorMax = new Vector2(1f, 1f);
+        hnRT.pivot     = new Vector2(0.5f, 1f);
+        hnRT.anchoredPosition = new Vector2(0f, -220f);
+        hnRT.sizeDelta = new Vector2(0f, 32f);
 
-            Image portImg = portGO.AddComponent<Image>();
-            if (data.portrait != null) portImg.sprite = data.portrait;
-            portImg.color = Color.white;
+        // Gelar Karakter
+        txtHeroTitle = CreateTMP(leftCol.transform, "HeroTitle", 13.5f, FontStyles.Normal,
+            new Color(0.85f, 0.80f, 0.75f, 1f), TextAlignmentOptions.Center);
+        RectTransform htRT = txtHeroTitle.rectTransform;
+        htRT.anchorMin = new Vector2(0f, 1f); htRT.anchorMax = new Vector2(1f, 1f);
+        htRT.pivot     = new Vector2(0.5f, 1f);
+        htRT.anchoredPosition = new Vector2(0f, -252f);
+        htRT.sizeDelta = new Vector2(0f, 22f);
 
-            // Character Name
-            TMP_Text nameTxt = CreateTMP(card.transform, "Name", 24f, FontStyles.Bold,
-                data.themeColor, TextAlignmentOptions.Center);
-            nameTxt.rectTransform.anchorMin = new Vector2(0f, 1f); nameTxt.rectTransform.anchorMax = new Vector2(1f, 1f);
-            nameTxt.rectTransform.pivot     = new Vector2(0.5f, 1f);
-            nameTxt.rectTransform.anchoredPosition = new Vector2(0f, -208f);
-            nameTxt.rectTransform.sizeDelta = new Vector2(0f, 30f);
-            nameTxt.characterSpacing = 2f;
-            nameTxt.text = data.name;
+        // Role Badge Box
+        GameObject roleBox = new GameObject("RoleBadge");
+        roleBox.transform.SetParent(leftCol.transform, false);
+        RectTransform rrt = roleBox.AddComponent<RectTransform>();
+        rrt.anchorMin = new Vector2(0.5f, 1f); rrt.anchorMax = new Vector2(0.5f, 1f);
+        rrt.pivot     = new Vector2(0.5f, 1f);
+        rrt.anchoredPosition = new Vector2(0f, -282f);
+        rrt.sizeDelta = new Vector2(300f, 30f);
 
-            // Title Tag
-            TMP_Text titleTxt = CreateTMP(card.transform, "Title", 13f, FontStyles.Normal,
-                new Color(0.85f, 0.80f, 0.75f, 1f), TextAlignmentOptions.Center);
-            titleTxt.rectTransform.anchorMin = new Vector2(0f, 1f); titleTxt.rectTransform.anchorMax = new Vector2(1f, 1f);
-            titleTxt.rectTransform.pivot     = new Vector2(0.5f, 1f);
-            titleTxt.rectTransform.anchoredPosition = new Vector2(0f, -238f);
-            titleTxt.rectTransform.sizeDelta = new Vector2(0f, 22f);
-            titleTxt.text = data.title;
+        Image rImg = roleBox.AddComponent<Image>();
+        rImg.color = new Color(0.12f, 0.08f, 0.22f, 0.90f);
+        if (btnFantasyNormal != null) { rImg.sprite = btnFantasyNormal; rImg.type = Image.Type.Sliced; }
 
-            // Role Tag Box
-            GameObject roleBox = new GameObject("RoleBox");
-            roleBox.transform.SetParent(card.transform, false);
-            RectTransform rrt = roleBox.AddComponent<RectTransform>();
-            rrt.anchorMin = new Vector2(0.5f, 1f); rrt.anchorMax = new Vector2(0.5f, 1f);
-            rrt.pivot     = new Vector2(0.5f, 1f);
-            rrt.anchoredPosition = new Vector2(0f, -270f);
-            rrt.sizeDelta = new Vector2(240f, 28f);
+        txtHeroRole = CreateTMP(roleBox.transform, "RoleTxt", 12.5f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
+        txtHeroRole.rectTransform.anchorMin = Vector2.zero; txtHeroRole.rectTransform.anchorMax = Vector2.one;
+        txtHeroRole.rectTransform.offsetMin = Vector2.zero; txtHeroRole.rectTransform.offsetMax = Vector2.zero;
 
-            Image rImg = roleBox.AddComponent<Image>();
-            rImg.color = new Color(0.12f, 0.08f, 0.22f, 0.85f);
-            TMP_Text rTxt = CreateTMP(roleBox.transform, "RoleTxt", 11.5f, FontStyles.Bold,
-                new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
-            rTxt.rectTransform.anchorMin = Vector2.zero; rTxt.rectTransform.anchorMax = Vector2.one;
-            rTxt.rectTransform.offsetMin = Vector2.zero; rTxt.rectTransform.offsetMax = Vector2.zero;
-            rTxt.text = data.role;
+        // Status Attributes (HP, ATK, DEF, SPD)
+        GameObject statsBox = new GameObject("StatsBox");
+        statsBox.transform.SetParent(leftCol.transform, false);
+        RectTransform sbRT = statsBox.AddComponent<RectTransform>();
+        sbRT.anchorMin = new Vector2(0.5f, 1f); sbRT.anchorMax = new Vector2(0.5f, 1f);
+        sbRT.pivot     = new Vector2(0.5f, 1f);
+        sbRT.anchoredPosition = new Vector2(0f, -325f);
+        sbRT.sizeDelta = new Vector2(400f, 50f);
 
-            // Lore Snippet
-            TMP_Text loreTxt = CreateTMP(card.transform, "Lore", 12f, FontStyles.Normal,
-                new Color(0.80f, 0.75f, 0.70f, 1f), TextAlignmentOptions.Center);
-            loreTxt.rectTransform.anchorMin = new Vector2(0f, 0f); loreTxt.rectTransform.anchorMax = new Vector2(1f, 0f);
-            loreTxt.rectTransform.pivot     = new Vector2(0.5f, 0f);
-            loreTxt.rectTransform.anchoredPosition = new Vector2(0f, 75f);
-            loreTxt.rectTransform.sizeDelta = new Vector2(250f, 65f);
-            loreTxt.text = data.lore;
+        txtHeroStats = CreateTMP(statsBox.transform, "TxtStats", 13f, FontStyles.Bold,
+            new Color(0.95f, 0.90f, 0.80f, 1f), TextAlignmentOptions.Center);
+        txtHeroStats.rectTransform.anchorMin = Vector2.zero; txtHeroStats.rectTransform.anchorMax = Vector2.one;
+        txtHeroStats.rectTransform.offsetMin = Vector2.zero; txtHeroStats.rectTransform.offsetMax = Vector2.zero;
 
-            // Selection Button
-            Button cardBtn = card.AddComponent<Button>();
-            cardBtn.onClick.AddListener(() => SelectCharacter(idx, true));
+        // Lore Box (Tertata rapi, tidak akan kelabasan!)
+        GameObject loreBox = new GameObject("LoreBox");
+        loreBox.transform.SetParent(leftCol.transform, false);
+        RectTransform lbRT = loreBox.AddComponent<RectTransform>();
+        lbRT.anchorMin = new Vector2(0.5f, 0f); lbRT.anchorMax = new Vector2(0.5f, 0f);
+        lbRT.pivot     = new Vector2(0.5f, 0f);
+        lbRT.anchoredPosition = new Vector2(0f, 25f);
+        lbRT.sizeDelta = new Vector2(420f, 120f);
 
-            // Selection Badge at bottom of card
-            GameObject badgeGO = new GameObject("SelectBadge");
-            badgeGO.transform.SetParent(card.transform, false);
-            RectTransform badgRT = badgeGO.AddComponent<RectTransform>();
-            badgRT.anchorMin = new Vector2(0.5f, 0f); badgRT.anchorMax = new Vector2(0.5f, 0f);
-            badgRT.pivot     = new Vector2(0.5f, 0f);
-            badgRT.anchoredPosition = new Vector2(0f, 20f);
-            badgRT.sizeDelta = new Vector2(220f, 38f);
+        Image lbImg = loreBox.AddComponent<Image>();
+        lbImg.color = new Color(0.08f, 0.05f, 0.16f, 0.70f);
 
-            Image badgImg = badgeGO.AddComponent<Image>();
-            if (btnFantasyNormal != null) { badgImg.sprite = btnFantasyNormal; badgImg.type = Image.Type.Sliced; }
-            badgImg.color = Color.white;
+        txtHeroLore = CreateTMP(loreBox.transform, "TxtLore", 12.5f, FontStyles.Normal,
+            new Color(0.85f, 0.82f, 0.76f, 1f), TextAlignmentOptions.Center);
+        txtHeroLore.rectTransform.anchorMin = Vector2.zero; txtHeroLore.rectTransform.anchorMax = Vector2.one;
+        txtHeroLore.rectTransform.offsetMin = new Vector2(16f, 10f); txtHeroLore.rectTransform.offsetMax = new Vector2(-16f, -10f);
 
-            TMP_Text badgeTxt = CreateTMP(badgeGO.transform, "TxtBadge", 14f, FontStyles.Bold,
-                new Color(1f, 0.95f, 0.80f, 1f), TextAlignmentOptions.Center);
-            badgeTxt.rectTransform.anchorMin = Vector2.zero; badgeTxt.rectTransform.anchorMax = Vector2.one;
-            badgeTxt.rectTransform.offsetMin = Vector2.zero; badgeTxt.rectTransform.offsetMax = Vector2.zero;
-            txtCardSelectionBadges[i] = badgeTxt;
-        }
+        // ── KOLOM KANAN: SKILL SHOWCASE (Lebar: 700, Tinggi: 540) ────────────
+        GameObject rightCol = new GameObject("Col_Right_Skills");
+        rightCol.transform.SetParent(canvas.transform, false);
+
+        RectTransform rightRT = rightCol.AddComponent<RectTransform>();
+        rightRT.anchorMin = new Vector2(0.5f, 0.5f);
+        rightRT.anchorMax = new Vector2(0.5f, 0.5f);
+        rightRT.pivot     = new Vector2(0.5f, 0.5f);
+        rightRT.anchoredPosition = new Vector2(280f, 25f);
+        rightRT.sizeDelta = new Vector2(700f, 540f);
+
+        Image rightBg = rightCol.AddComponent<Image>();
+        if (modalPanelSprite != null) { rightBg.sprite = modalPanelSprite; rightBg.type = Image.Type.Sliced; }
+        rightBg.color = new Color(1f, 1f, 1f, 0.98f);
+
+        CreateGoldDivider(rightCol.transform, 1f, 0f);
+        CreateGoldDivider(rightCol.transform, 0f, 0f);
+
+        // Header Skill Panel
+        TMP_Text rHeader = CreateTMP(rightCol.transform, "SkillHeader", 17f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Left);
+        rHeader.rectTransform.anchorMin = new Vector2(0f, 1f); rHeader.rectTransform.anchorMax = new Vector2(1f, 1f);
+        rHeader.rectTransform.pivot     = new Vector2(0f, 1f);
+        rHeader.rectTransform.anchoredPosition = new Vector2(30f, -20f);
+        rHeader.rectTransform.sizeDelta = new Vector2(-60f, 26f);
+        rHeader.text = "✦  JURUS PEDANG & KEMAMPUAN SAKTI  ✦";
+
+        // 3 Baris Kotak Skill Lengkap dengan Ikon
+        float startY = -62f;
+        float slotHeight = 138f;
+        float slotGap = 16f;
+
+        // Skill 1 [A]
+        var sk1 = BuildSkillSlot(rightCol.transform, "Slot_Skill1", startY, new Color(1.0f, 0.60f, 0.15f, 1f));
+        imgSkill1Icon = sk1.icon; txtSkill1Header = sk1.header; txtSkill1Desc = sk1.desc;
+
+        // Skill 2 [S]
+        var sk2 = BuildSkillSlot(rightCol.transform, "Slot_Skill2", startY - (slotHeight + slotGap), new Color(1.0f, 0.45f, 0.20f, 1f));
+        imgSkill2Icon = sk2.icon; txtSkill2Header = sk2.header; txtSkill2Desc = sk2.desc;
+
+        // Skill 3 [W] (Ultimate)
+        var sk3 = BuildSkillSlot(rightCol.transform, "Slot_Skill3", startY - (slotHeight + slotGap) * 2, new Color(1.0f, 0.25f, 0.25f, 1f));
+        imgSkill3Icon = sk3.icon; txtSkill3Header = sk3.header; txtSkill3Desc = sk3.desc;
     }
 
-    private void BuildSkillDetailPanel()
+    private void BuildCarouselArrows(Transform parent)
     {
-        // Panel Detail di sebelah kanan (X = 260)
-        GameObject panel = new GameObject("DetailPanel");
-        panel.transform.SetParent(canvas.transform, false);
+        // Tombol Panah KIRI [ ◄ ]
+        GameObject btnLeft = new GameObject("BtnArrowLeft");
+        btnLeft.transform.SetParent(parent, false);
+        RectTransform blRT = btnLeft.AddComponent<RectTransform>();
+        blRT.anchorMin = new Vector2(0f, 1f); blRT.anchorMax = new Vector2(0f, 1f);
+        blRT.pivot     = new Vector2(0.5f, 0.5f);
+        blRT.anchoredPosition = new Vector2(40f, -125f);
+        blRT.sizeDelta = new Vector2(52f, 52f);
 
-        RectTransform prt = panel.AddComponent<RectTransform>();
-        prt.anchorMin = new Vector2(0.5f, 0.5f);
-        prt.anchorMax = new Vector2(0.5f, 0.5f);
-        prt.pivot     = new Vector2(0.5f, 0.5f);
-        prt.anchoredPosition = new Vector2(250f, 30f);
-        prt.sizeDelta = new Vector2(640f, 460f);
+        Image blImg = btnLeft.AddComponent<Image>();
+        if (btnFantasyNormal != null) { blImg.sprite = btnFantasyNormal; blImg.type = Image.Type.Sliced; }
+        blImg.color = Color.white;
 
-        Image pImg = panel.AddComponent<Image>();
-        if (modalPanelSprite != null)
-        {
-            pImg.sprite = modalPanelSprite;
-            pImg.type   = Image.Type.Sliced;
-            pImg.color  = new Color(1f, 1f, 1f, 0.98f);
-        }
-        else
-        {
-            pImg.color = new Color(0.08f, 0.05f, 0.16f, 0.96f);
-        }
+        Button blBtn = btnLeft.AddComponent<Button>();
+        blBtn.onClick.AddListener(() => SwitchCharacter(-1));
 
-        CreateGoldDivider(panel.transform, 1f, 0f);
-        CreateGoldDivider(panel.transform, 0f, 0f);
+        TMP_Text blTxt = CreateTMP(btnLeft.transform, "TxtLeft", 22f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
+        blTxt.rectTransform.anchorMin = Vector2.zero; blTxt.rectTransform.anchorMax = Vector2.one;
+        blTxt.rectTransform.offsetMin = Vector2.zero; blTxt.rectTransform.offsetMax = Vector2.zero;
+        blTxt.text = "◄";
 
-        // Header Detail
-        TMP_Text pHeader = CreateTMP(panel.transform, "Header", 16f, FontStyles.Bold,
-            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Left);
-        pHeader.rectTransform.anchorMin = new Vector2(0f, 1f); pHeader.rectTransform.anchorMax = new Vector2(1f, 1f);
-        pHeader.rectTransform.pivot     = new Vector2(0f, 1f);
-        pHeader.rectTransform.anchoredPosition = new Vector2(25f, -18f);
-        pHeader.rectTransform.sizeDelta = new Vector2(-50f, 25f);
-        pHeader.text = "✦  STATUS & JURUS PEDANG SAKTI  ✦";
+        // Tombol Panah KANAN [ ► ]
+        GameObject btnRight = new GameObject("BtnArrowRight");
+        btnRight.transform.SetParent(parent, false);
+        RectTransform brRT = btnRight.AddComponent<RectTransform>();
+        brRT.anchorMin = new Vector2(1f, 1f); brRT.anchorMax = new Vector2(1f, 1f);
+        brRT.pivot     = new Vector2(0.5f, 0.5f);
+        brRT.anchoredPosition = new Vector2(-40f, -125f);
+        brRT.sizeDelta = new Vector2(52f, 52f);
 
-        // Stats Display (HP, ATK, SPD)
-        GameObject statsRow = new GameObject("StatsRow");
-        statsRow.transform.SetParent(panel.transform, false);
-        RectTransform srt = statsRow.AddComponent<RectTransform>();
+        Image brImg = btnRight.AddComponent<Image>();
+        if (btnFantasyNormal != null) { brImg.sprite = btnFantasyNormal; brImg.type = Image.Type.Sliced; }
+        brImg.color = Color.white;
+
+        Button brBtn = btnRight.AddComponent<Button>();
+        brBtn.onClick.AddListener(() => SwitchCharacter(1));
+
+        TMP_Text brTxt = CreateTMP(btnRight.transform, "TxtRight", 22f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
+        brTxt.rectTransform.anchorMin = Vector2.zero; brTxt.rectTransform.anchorMax = Vector2.one;
+        brTxt.rectTransform.offsetMin = Vector2.zero; brTxt.rectTransform.offsetMax = Vector2.zero;
+        brTxt.text = "►";
+
+        // Page Indicator di bawah ("Karakter 1 / 2")
+        txtPageIndicator = CreateTMP(parent, "PageIndicator", 12f, FontStyles.Bold,
+            new Color(0.70f, 0.70f, 0.70f, 0.85f), TextAlignmentOptions.Center);
+        RectTransform piRT = txtPageIndicator.rectTransform;
+        piRT.anchorMin = new Vector2(0.5f, 1f); piRT.anchorMax = new Vector2(0.5f, 1f);
+        piRT.pivot     = new Vector2(0.5f, 1f);
+        piRT.anchoredPosition = new Vector2(0f, -12f);
+        piRT.sizeDelta = new Vector2(200f, 20f);
+    }
+
+    private (Image icon, TMP_Text header, TMP_Text desc) BuildSkillSlot(Transform parent, string name, float posY, Color accent)
+    {
+        GameObject slot = new GameObject(name);
+        slot.transform.SetParent(parent, false);
+
+        RectTransform srt = slot.AddComponent<RectTransform>();
         srt.anchorMin = new Vector2(0f, 1f); srt.anchorMax = new Vector2(1f, 1f);
         srt.pivot     = new Vector2(0.5f, 1f);
-        srt.anchoredPosition = new Vector2(0f, -48f);
-        srt.sizeDelta = new Vector2(-50f, 30f);
+        srt.anchoredPosition = new Vector2(0f, posY);
+        srt.sizeDelta = new Vector2(-48f, 134f);
 
-        txtStatHP = CreateTMP(statsRow.transform, "StatHP", 13f, FontStyles.Bold, new Color(0.4f, 1f, 0.5f, 1f), TextAlignmentOptions.Left);
-        txtStatHP.rectTransform.anchorMin = new Vector2(0f, 0f); txtStatHP.rectTransform.anchorMax = new Vector2(0.33f, 1f);
-        txtStatHP.rectTransform.offsetMin = Vector2.zero; txtStatHP.rectTransform.offsetMax = Vector2.zero;
+        Image slotBg = slot.AddComponent<Image>();
+        slotBg.color = new Color(0.11f, 0.08f, 0.20f, 0.88f);
+        if (btnFantasyNormal != null) { slotBg.sprite = btnFantasyNormal; slotBg.type = Image.Type.Sliced; }
 
-        txtStatATK = CreateTMP(statsRow.transform, "StatATK", 13f, FontStyles.Bold, new Color(1f, 0.4f, 0.4f, 1f), TextAlignmentOptions.Center);
-        txtStatATK.rectTransform.anchorMin = new Vector2(0.33f, 0f); txtStatATK.rectTransform.anchorMax = new Vector2(0.66f, 1f);
-        txtStatATK.rectTransform.offsetMin = Vector2.zero; txtStatATK.rectTransform.offsetMax = Vector2.zero;
-
-        txtStatSPD = CreateTMP(statsRow.transform, "StatSPD", 13f, FontStyles.Bold, new Color(0.4f, 0.85f, 1f, 1f), TextAlignmentOptions.Right);
-        txtStatSPD.rectTransform.anchorMin = new Vector2(0.66f, 0f); txtStatSPD.rectTransform.anchorMax = new Vector2(1f, 1f);
-        txtStatSPD.rectTransform.offsetMin = Vector2.zero; txtStatSPD.rectTransform.offsetMax = Vector2.zero;
-
-        // 3 Skill Boxes [A], [S], [W]
-        float startY = -92f;
-        float boxHeight = 110f;
-        float gap = 8f;
-
-        // Skill 1
-        var sk1 = BuildSingleSkillBox(panel.transform, "Skill1Box", startY, new Color(1.0f, 0.55f, 0.15f, 1f));
-        txtSkill1Title = sk1.title; txtSkill1Desc = sk1.desc;
-
-        // Skill 2
-        var sk2 = BuildSingleSkillBox(panel.transform, "Skill2Box", startY - (boxHeight + gap), new Color(1.0f, 0.40f, 0.20f, 1f));
-        txtSkill2Title = sk2.title; txtSkill2Desc = sk2.desc;
-
-        // Skill 3 (Ultimate)
-        var sk3 = BuildSingleSkillBox(panel.transform, "Skill3Box", startY - (boxHeight + gap) * 2, new Color(1.0f, 0.25f, 0.25f, 1f));
-        txtSkill3Title = sk3.title; txtSkill3Desc = sk3.desc;
-    }
-
-    private (TMP_Text title, TMP_Text desc) BuildSingleSkillBox(Transform parent, string name, float posY, Color accent)
-    {
-        GameObject box = new GameObject(name);
-        box.transform.SetParent(parent, false);
-
-        RectTransform brt = box.AddComponent<RectTransform>();
-        brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f);
-        brt.pivot     = new Vector2(0.5f, 1f);
-        brt.anchoredPosition = new Vector2(0f, posY);
-        brt.sizeDelta = new Vector2(-40f, 106f);
-
-        Image img = box.AddComponent<Image>();
-        img.color = new Color(0.12f, 0.08f, 0.22f, 0.85f);
-        if (btnFantasyNormal != null) { img.sprite = btnFantasyNormal; img.type = Image.Type.Sliced; }
-
-        // Strip Accent Kiri
+        // Strip Accent di kiri slot
         GameObject strip = new GameObject("Strip");
-        strip.transform.SetParent(box.transform, false);
-        RectTransform srt = strip.AddComponent<RectTransform>();
-        srt.anchorMin = new Vector2(0f, 0f); srt.anchorMax = new Vector2(0f, 1f);
-        srt.pivot     = new Vector2(0f, 0.5f);
-        srt.anchoredPosition = Vector2.zero;
-        srt.sizeDelta = new Vector2(6f, 0f);
+        strip.transform.SetParent(slot.transform, false);
+        RectTransform stRT = strip.AddComponent<RectTransform>();
+        stRT.anchorMin = new Vector2(0f, 0f); stRT.anchorMax = new Vector2(0f, 1f);
+        stRT.pivot     = new Vector2(0f, 0.5f);
+        stRT.anchoredPosition = Vector2.zero;
+        stRT.sizeDelta = new Vector2(6f, 0f);
         strip.AddComponent<Image>().color = accent;
 
-        // Title
-        TMP_Text title = CreateTMP(box.transform, "Title", 15.5f, FontStyles.Bold, accent, TextAlignmentOptions.Left);
-        title.rectTransform.anchorMin = new Vector2(0f, 1f); title.rectTransform.anchorMax = new Vector2(1f, 1f);
-        title.rectTransform.pivot     = new Vector2(0f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(18f, -10f);
-        title.rectTransform.sizeDelta = new Vector2(-36f, 26f);
+        // Skill Icon Frame (84 x 84 px)
+        GameObject iconBox = new GameObject("IconBox");
+        iconBox.transform.SetParent(slot.transform, false);
+        RectTransform ibRT = iconBox.AddComponent<RectTransform>();
+        ibRT.anchorMin = new Vector2(0f, 0.5f); ibRT.anchorMax = new Vector2(0f, 0.5f);
+        ibRT.pivot     = new Vector2(0f, 0.5f);
+        ibRT.anchoredPosition = new Vector2(20f, 0f);
+        ibRT.sizeDelta = new Vector2(88f, 88f);
 
-        // Description
-        TMP_Text desc = CreateTMP(box.transform, "Desc", 12.5f, FontStyles.Normal,
-            new Color(0.88f, 0.84f, 0.78f, 1f), TextAlignmentOptions.TopLeft);
+        Image ibBg = iconBox.AddComponent<Image>();
+        ibBg.color = new Color(0.06f, 0.04f, 0.14f, 0.95f);
+
+        // Icon Sprite Image
+        GameObject iconImgGO = new GameObject("IconImg");
+        iconImgGO.transform.SetParent(iconBox.transform, false);
+        RectTransform iiRT = iconImgGO.AddComponent<RectTransform>();
+        iiRT.anchorMin = Vector2.zero; iiRT.anchorMax = Vector2.one;
+        iiRT.offsetMin = new Vector2(6f, 6f); iiRT.offsetMax = new Vector2(-6f, -6f);
+        Image iconImg = iconImgGO.AddComponent<Image>();
+        iconImg.color = Color.white;
+
+        // Skill Header (Judul Jurus + Cooldown)
+        TMP_Text header = CreateTMP(slot.transform, "Header", 15.5f, FontStyles.Bold,
+            accent, TextAlignmentOptions.Left);
+        header.rectTransform.anchorMin = new Vector2(0f, 1f); header.rectTransform.anchorMax = new Vector2(1f, 1f);
+        header.rectTransform.pivot     = new Vector2(0f, 1f);
+        header.rectTransform.anchoredPosition = new Vector2(125f, -14f);
+        header.rectTransform.sizeDelta = new Vector2(-140f, 26f);
+
+        // Skill Description (Tertata rapi di kanan)
+        TMP_Text desc = CreateTMP(slot.transform, "Desc", 13f, FontStyles.Normal,
+            new Color(0.90f, 0.86f, 0.80f, 1f), TextAlignmentOptions.TopLeft);
         desc.rectTransform.anchorMin = new Vector2(0f, 0f); desc.rectTransform.anchorMax = new Vector2(1f, 1f);
         desc.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
-        desc.rectTransform.offsetMin = new Vector2(18f, 8f);
-        desc.rectTransform.offsetMax = new Vector2(-18f, -38f);
+        desc.rectTransform.offsetMin = new Vector2(125f, 12f);
+        desc.rectTransform.offsetMax = new Vector2(-20f, -44f);
 
-        return (title, desc);
+        return (iconImg, header, desc);
     }
 
-    private void BuildBottomActionButtons()
+    private void BuildBottomControls()
     {
         // Tombol Kembali ke Stage Select (Kiri Bawah)
-        GameObject btnBackObj = new GameObject("BtnBackToStages");
-        btnBackObj.transform.SetParent(canvas.transform, false);
-        RectTransform backRT = btnBackObj.AddComponent<RectTransform>();
-        backRT.anchorMin = new Vector2(0.5f, 0f); backRT.anchorMax = new Vector2(0.5f, 0f);
-        backRT.pivot     = new Vector2(0.5f, 0f);
-        backRT.anchoredPosition = new Vector2(-280f, 30f);
-        backRT.sizeDelta = new Vector2(280f, 52f);
+        GameObject btnBack = new GameObject("BtnBack");
+        btnBack.transform.SetParent(canvas.transform, false);
+        RectTransform bRT = btnBack.AddComponent<RectTransform>();
+        bRT.anchorMin = new Vector2(0.5f, 0f); bRT.anchorMax = new Vector2(0.5f, 0f);
+        bRT.pivot     = new Vector2(0.5f, 0f);
+        bRT.anchoredPosition = new Vector2(-360f, 25f);
+        bRT.sizeDelta = new Vector2(280f, 52f);
 
-        Image backImg = btnBackObj.AddComponent<Image>();
-        if (btnFantasyNormal != null) { backImg.sprite = btnFantasyNormal; backImg.type = Image.Type.Sliced; }
-        backImg.color = Color.white;
+        Image bImg = btnBack.AddComponent<Image>();
+        if (btnFantasyNormal != null) { bImg.sprite = btnFantasyNormal; bImg.type = Image.Type.Sliced; }
+        bImg.color = Color.white;
 
-        Button backBtn = btnBackObj.AddComponent<Button>();
-        backBtn.onClick.AddListener(OnBackToStagesClicked);
+        Button btn = btnBack.AddComponent<Button>();
+        btn.onClick.AddListener(OnBackClicked);
 
-        TMP_Text backTxt = CreateTMP(btnBackObj.transform, "TxtBack", 16f, FontStyles.Bold,
+        TMP_Text bTxt = CreateTMP(btnBack.transform, "TxtBack", 16f, FontStyles.Bold,
             new Color(0.90f, 0.82f, 0.70f, 1f), TextAlignmentOptions.Center);
-        backTxt.rectTransform.anchorMin = Vector2.zero; backTxt.rectTransform.anchorMax = Vector2.one;
-        backTxt.rectTransform.offsetMin = Vector2.zero; backTxt.rectTransform.offsetMax = Vector2.zero;
-        backTxt.text = "←  KEMBALI KE STAGE";
+        bTxt.rectTransform.anchorMin = Vector2.zero; bTxt.rectTransform.anchorMax = Vector2.one;
+        bTxt.rectTransform.offsetMin = Vector2.zero; bTxt.rectTransform.offsetMax = Vector2.zero;
+        bTxt.text = "←  KEMBALI KE STAGE";
 
-        // Tombol Konfirmasi Mainkan (Kanan Bawah)
-        GameObject btnConfirmObj = new GameObject("BtnConfirmPlay");
-        btnConfirmObj.transform.SetParent(canvas.transform, false);
-        RectTransform confRT = btnConfirmObj.AddComponent<RectTransform>();
-        confRT.anchorMin = new Vector2(0.5f, 0f); confRT.anchorMax = new Vector2(0.5f, 0f);
-        confRT.pivot     = new Vector2(0.5f, 0f);
-        confRT.anchoredPosition = new Vector2(250f, 30f);
-        confRT.sizeDelta = new Vector2(360f, 56f);
+        // Tombol Mainkan Sebagai [Hero] (Kanan Bawah)
+        GameObject btnPlay = new GameObject("BtnPlay");
+        btnPlay.transform.SetParent(canvas.transform, false);
+        RectTransform pRT = btnPlay.AddComponent<RectTransform>();
+        pRT.anchorMin = new Vector2(0.5f, 0f); pRT.anchorMax = new Vector2(0.5f, 0f);
+        pRT.pivot     = new Vector2(0.5f, 0f);
+        pRT.anchoredPosition = new Vector2(280f, 25f);
+        pRT.sizeDelta = new Vector2(420f, 56f);
 
-        Image confImg = btnConfirmObj.AddComponent<Image>();
-        if (btnFantasyNormal != null) { confImg.sprite = btnFantasyNormal; confImg.type = Image.Type.Sliced; }
-        confImg.color = Color.white;
+        Image pImg = btnPlay.AddComponent<Image>();
+        if (btnFantasyNormal != null) { pImg.sprite = btnFantasyNormal; pImg.type = Image.Type.Sliced; }
+        pImg.color = Color.white;
 
-        btnConfirmPlay = btnConfirmObj.AddComponent<Button>();
+        Button playBtn = btnPlay.AddComponent<Button>();
         if (btnFantasyHover != null)
         {
-            btnConfirmPlay.transition = Selectable.Transition.SpriteSwap;
+            playBtn.transition = Selectable.Transition.SpriteSwap;
             SpriteState ss = new SpriteState();
             ss.highlightedSprite = btnFantasyHover;
             ss.pressedSprite     = btnFantasyHover;
             ss.selectedSprite    = btnFantasyHover;
-            btnConfirmPlay.spriteState = ss;
+            playBtn.spriteState = ss;
         }
-        btnConfirmPlay.onClick.AddListener(OnConfirmPlayClicked);
+        playBtn.onClick.AddListener(OnPlayClicked);
 
-        txtConfirmBtnLabel = CreateTMP(btnConfirmObj.transform, "TxtConfirm", 19f, FontStyles.Bold,
+        txtPlayBtnLabel = CreateTMP(btnPlay.transform, "TxtPlay", 18f, FontStyles.Bold,
             new Color(1f, 0.92f, 0.40f, 1f), TextAlignmentOptions.Center);
-        txtConfirmBtnLabel.characterSpacing = 2f;
-        txtConfirmBtnLabel.rectTransform.anchorMin = Vector2.zero; txtConfirmBtnLabel.rectTransform.anchorMax = Vector2.one;
-        txtConfirmBtnLabel.rectTransform.offsetMin = Vector2.zero; txtConfirmBtnLabel.rectTransform.offsetMax = Vector2.zero;
+        txtPlayBtnLabel.characterSpacing = 2f;
+        txtPlayBtnLabel.rectTransform.anchorMin = Vector2.zero; txtPlayBtnLabel.rectTransform.anchorMax = Vector2.one;
+        txtPlayBtnLabel.rectTransform.offsetMin = Vector2.zero; txtPlayBtnLabel.rectTransform.offsetMax = Vector2.zero;
     }
 
     private void CreateGoldDivider(Transform parent, float anchorY, float posY)
@@ -597,73 +664,125 @@ public class CharacterSelectScene : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // INTERAKSI PEMILIHAN KARAKTER
+    // LOGIKA PERGANTIAN KARAKTER (CAROUSEL SWITCH)
     // ─────────────────────────────────────────────────────────────────────
-    private void SelectCharacter(int idx, bool playSfx)
+    private void SwitchCharacter(int direction)
     {
-        if (idx < 0 || idx >= characters.Length) return;
-        selectedIndex = idx;
+        currentIndex += direction;
+        if (currentIndex < 0) currentIndex = characters.Length - 1;
+        if (currentIndex >= characters.Length) currentIndex = 0;
 
-        if (playSfx && audioSource != null && sfxSelect != null)
+        UpdateCharacterDisplay(true);
+    }
+
+    private void UpdateCharacterDisplay(bool playSfx)
+    {
+        if (playSfx && audioSource != null && sfxSwitch != null)
         {
-            audioSource.PlayOneShot(sfxSelect, 0.9f);
+            audioSource.PlayOneShot(sfxSwitch, 0.9f);
         }
 
-        CharacterData data = characters[idx];
+        CharacterEntry c = characters[currentIndex];
 
-        // Update Card Highlights
-        for (int i = 0; i < characters.Length; i++)
+        // 1. Update Kolom Kiri
+        if (imgCharacterPortrait != null && c.portrait != null)
         {
-            bool isCurrent = (i == idx);
-            if (cardBorderHighlights[i] != null)
-            {
-                cardBorderHighlights[i].color = isCurrent
-                    ? new Color(1f, 0.85f, 0.35f, 0.90f)
-                    : new Color(1f, 0.85f, 0.35f, 0f);
-            }
-
-            if (txtCardSelectionBadges[i] != null)
-            {
-                txtCardSelectionBadges[i].text = isCurrent ? "✔ TERPILIH" : "KLIK UNTUK MEMILIH";
-                txtCardSelectionBadges[i].color = isCurrent
-                    ? new Color(0.35f, 1f, 0.55f, 1f)
-                    : new Color(0.75f, 0.70f, 0.65f, 0.9f);
-            }
-
-            if (characterCards[i] != null)
-            {
-                characterCards[i].GetComponent<RectTransform>().localScale = isCurrent
-                    ? new Vector3(1.04f, 1.04f, 1f)
-                    : Vector3.one;
-            }
+            imgCharacterPortrait.sprite = c.portrait;
         }
 
-        // Update Detail Panel
-        if (txtStatHP != null)  txtStatHP.text  = $"HP: {data.statHP}";
-        if (txtStatATK != null) txtStatATK.text = $"ATK: {data.statATK}";
-        if (txtStatSPD != null) txtStatSPD.text = $"SPD: {data.statSPD}";
-
-        if (txtSkill1Title != null) txtSkill1Title.text = data.skill1Name;
-        if (txtSkill1Desc != null)  txtSkill1Desc.text  = data.skill1Desc;
-
-        if (txtSkill2Title != null) txtSkill2Title.text = data.skill2Name;
-        if (txtSkill2Desc != null)  txtSkill2Desc.text  = data.skill2Desc;
-
-        if (txtSkill3Title != null) txtSkill3Title.text = data.skill3Name;
-        if (txtSkill3Desc != null)  txtSkill3Desc.text  = data.skill3Desc;
-
-        if (txtConfirmBtnLabel != null)
+        if (txtHeroName != null)
         {
-            txtConfirmBtnLabel.text = $"▶  MAINKAN SEBAGAI {data.name}";
+            txtHeroName.text = c.name;
+            txtHeroName.color = c.themeColor;
+        }
+
+        if (txtHeroTitle != null) txtHeroTitle.text = c.title;
+        if (txtHeroRole != null)  txtHeroRole.text  = c.role;
+        if (txtHeroLore != null)  txtHeroLore.text  = $"\"{c.lore}\"";
+
+        if (txtHeroStats != null)
+        {
+            txtHeroStats.text = $"HP: <color=#66FF88>{c.statHP}</color>   ATK: <color=#FF6666>{c.statATK}</color>\nDEF: <color=#FFCC44>{c.statDEF}</color>   SPD: <color=#66CCFF>{c.statSPD}</color>";
+        }
+
+        if (txtPageIndicator != null)
+        {
+            txtPageIndicator.text = $"[ KARAKTER  {currentIndex + 1}  /  {characters.Length} ]";
+        }
+
+        // 2. Update Kolom Kanan (Skill Showcase)
+        if (imgSkill1Icon != null && c.skill1Icon != null) imgSkill1Icon.sprite = c.skill1Icon;
+        if (txtSkill1Header != null) txtSkill1Header.text = $"{c.skill1Title}   <size=11><color=#FFDD88>({c.skill1Cooldown})</color></size>";
+        if (txtSkill1Desc != null)   txtSkill1Desc.text   = c.skill1Desc;
+
+        if (imgSkill2Icon != null && c.skill2Icon != null) imgSkill2Icon.sprite = c.skill2Icon;
+        if (txtSkill2Header != null) txtSkill2Header.text = $"{c.skill2Title}   <size=11><color=#FFDD88>({c.skill2Cooldown})</color></size>";
+        if (txtSkill2Desc != null)   txtSkill2Desc.text   = c.skill2Desc;
+
+        if (imgSkill3Icon != null && c.skill3Icon != null) imgSkill3Icon.sprite = c.skill3Icon;
+        if (txtSkill3Header != null) txtSkill3Header.text = $"{c.skill3Title}   <size=11><color=#FFDD88>({c.skill3Cooldown})</color></size>";
+        if (txtSkill3Desc != null)   txtSkill3Desc.text   = c.skill3Desc;
+
+        // 3. Update Tombol Konfirmasi Mainkan
+        if (txtPlayBtnLabel != null)
+        {
+            txtPlayBtnLabel.text = $"▶  MAINKAN SEBAGAI {c.name}";
+        }
+
+        // Trigger Pop animation pada portrait
+        StartCoroutine(PortraitPopRoutine());
+    }
+
+    private IEnumerator PortraitPopRoutine()
+    {
+        if (portraitRT == null) yield break;
+
+        portraitRT.localScale = new Vector3(0.85f, 0.85f, 1f);
+        float elapsed = 0f;
+        float dur = 0.20f;
+        while (elapsed < dur)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / dur;
+            float s = Mathf.SmoothStep(0.85f, 1f, t);
+            portraitRT.localScale = new Vector3(s, s, 1f);
+            yield return null;
+        }
+        portraitRT.localScale = Vector3.one;
+    }
+
+    private void Update()
+    {
+        // Navigasi Keyboard Panah Kiri / Kanan atau A / D
+        if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+        {
+            SwitchCharacter(-1);
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+        {
+            SwitchCharacter(1);
+        }
+
+        // Konfirmasi dengan Enter / Space
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            OnPlayClicked();
+        }
+
+        // Idle bobbing / bernapas lembut pada portrait
+        if (portraitRT != null)
+        {
+            float bob = Mathf.Sin(Time.time * 2.2f) * 4f;
+            portraitRT.anchoredPosition = new Vector2(0f, -40f + bob);
         }
     }
 
-    private void OnConfirmPlayClicked()
+    private void OnPlayClicked()
     {
-        CharacterData chosen = characters[selectedIndex];
+        CharacterEntry chosen = characters[currentIndex];
 
-        // Simpan karakter terpilih ke PlayerPrefs
-        PlayerPrefs.SetInt("SelectedCharacterID", selectedIndex);
+        // Simpan ke PlayerPrefs
+        PlayerPrefs.SetInt("SelectedCharacterID", currentIndex);
         PlayerPrefs.SetString("SelectedCharacterName", chosen.name);
         PlayerPrefs.Save();
 
@@ -672,7 +791,7 @@ public class CharacterSelectScene : MonoBehaviour
         StartCoroutine(LoadSceneWithFade(targetScene));
     }
 
-    private void OnBackToStagesClicked()
+    private void OnBackClicked()
     {
         if (audioSource != null && sfxClick != null) audioSource.PlayOneShot(sfxClick);
         StartCoroutine(LoadSceneWithFade("StageSelect"));
@@ -680,7 +799,6 @@ public class CharacterSelectScene : MonoBehaviour
 
     private IEnumerator LoadSceneWithFade(string sceneName)
     {
-        // Simple Fade Out
         GameObject fadeGO = new GameObject("FadeOut");
         fadeGO.transform.SetParent(canvas.transform, false);
         fadeGO.transform.SetAsLastSibling();
