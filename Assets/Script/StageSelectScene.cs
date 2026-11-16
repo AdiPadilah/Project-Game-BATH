@@ -469,15 +469,27 @@ public class StageSelectScene : MonoBehaviour
     void OnStageClicked(int idx)
     {
         PlayClickSfx();
-        int buildIdx = stageBuildIdx[idx];
-        if (buildIdx >= 0)
-            StartCoroutine(LoadSceneRoutine(buildIdx));
+        if (idx == 0)
+        {
+            // Stage 0: Langsung masuk ke Tutorial Gameplay
+            StartCoroutine(LoadSceneByNameRoutine("GamePlay"));
+        }
+        else
+        {
+            // Stage 1 dan seterusnya: Masuk ke Scene Pemilihan Karakter
+            PlayerPrefs.SetInt("TargetStageIndex", idx);
+            PlayerPrefs.SetString("TargetStageName", stageNames[idx]);
+            PlayerPrefs.SetString("TargetSceneName", "Next");
+            PlayerPrefs.Save();
+
+            StartCoroutine(LoadSceneByNameRoutine("CharacterSelect"));
+        }
     }
 
     void GoBackToMenu()
     {
         PlayClickSfx();
-        StartCoroutine(LoadSceneRoutine(0));  // index 0 = Main Menu
+        StartCoroutine(LoadSceneByNameRoutine("Main Menu"));
     }
 
     IEnumerator LoadSceneRoutine(int buildIdx)
@@ -485,6 +497,12 @@ public class StageSelectScene : MonoBehaviour
         // Fade out singkat sebelum pindah scene
         yield return StartCoroutine(FadeOut());
         SceneManager.LoadScene(buildIdx);
+    }
+
+    IEnumerator LoadSceneByNameRoutine(string sceneName)
+    {
+        yield return StartCoroutine(FadeOut());
+        SceneManager.LoadScene(sceneName);
     }
 
     // ── Animasi Intro (kartu muncul dari bawah) ───────────────────────────
