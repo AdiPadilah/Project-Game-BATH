@@ -6,12 +6,12 @@ using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// StoryScene — Cutscene Latar Belakang Karakter bergaya Manhwa Sinematik (Sesuai Referensi Webtoon/Solo Leveling).
-/// - Ilustrasi Manhwa Besar di Tengah Layar (Framed Art Panel)
-/// - Efek Onomatopoeia / SFX Teks Manhwa Korea/Dark Fantasy (e.g. 콰아아앙! / ROAR!)
-/// - Kotak Dialog & Narasi Manhwa dengan Badge Pembicara Berwarna
-/// - Kontrol Navigasi: [ ◄ SEBELUMNYA ], [ LANJUTKAN ► ], [ LEWATI (SKIP) ]
-/// - Typewriter Effect per huruf dengan skip saat klik
+/// StoryScene — Cutscene Latar Belakang Karakter bergaya Manhwa Sinematik Hand-Drawn 2D:
+/// - Dimulai dengan masa lalu bahagia keluarga di desa pegunungan yang damai.
+/// - Berlanjut ke tragedi malam kehancuran, hilangnya orang tercinta, keputusasaan.
+/// - Sumpah dan ambisi untuk menjadi lebih kuat agar tidak ada lagi penyesalan.
+/// - Berlanjut ke Stage 1: Misi Penyelamatan Tawanan di Lembah Reruntuhan Kuno.
+/// - Dilengkapi ilustrasi manhwa 2D, onomatopoeia SFX, layout dialog proporsional tanpa offset.
 /// </summary>
 public class StoryScene : MonoBehaviour
 {
@@ -44,13 +44,12 @@ public class StoryScene : MonoBehaviour
     private Sprite btnFantasyPressed;
     private Sprite screenVignette;
 
-    // Manhwa Scene Art Sprites
+    // Manhwa Scene Art Sprites (2D Hand-drawn Comic Inked Art)
+    private Sprite artPeacefulDays;
     private Sprite artAshenvaleFall;
     private Sprite artEloraKidnapped;
     private Sprite artKaelenAwakening;
     private Sprite artAncientRuins;
-    private Sprite portraitKaelen;
-    private Sprite portraitValeria;
 
     private TMP_FontAsset tmpFont;
     private AudioClip sfxClick;
@@ -66,8 +65,7 @@ public class StoryScene : MonoBehaviour
     // Central Manhwa Artwork Frame
     private GameObject manhwaFrameGO;
     private Image imgManhwaArt;
-    private Image imgArtGlow;
-    private TMP_Text txtManhwaSFX;          // Onomatopoeia floating text (콰아아앙!)
+    private TMP_Text txtManhwaSFX;          // Onomatopoeia floating text (e.g. 콰아아앙!)
     private TMP_Text txtChapterTag;         // Episode/Chapter tag top-right of art
 
     // Dialogue / Caption Overlay Box
@@ -88,16 +86,15 @@ public class StoryScene : MonoBehaviour
     // ── Story State ───────────────────────────────────────────────────────
     private class StoryBeat
     {
-        public string chapterTag;       // e.g. "EPISODE 0 • HARI KEHANCURAN"
-        public string onomatopoeia;     // e.g. "《 콰아아앙! (KABOOM!) 》"
-        public string speaker;          // e.g. "KAELEN", "NARASI", "ELORA"
-        public string subtitle;         // e.g. "Masa Lalu yang Terbakar di Ashenvale"
+        public string chapterTag;       // e.g. "PROLOG • HARI-HARI DAMAI"
+        public string onomatopoeia;     // e.g. "《 ♬ 하하호호 (SENYUM & TAWA) 》"
+        public string speaker;          // e.g. "NARASI", "KAELEN", "TRAGEDI"
+        public string subtitle;         // e.g. "Lembah Bunga Ashenvale yang Penuh Kedamaian"
         public string text;             // Isi cerita lengkap
         public Sprite artSprite;        // Gambar ilustrasi manhwa
-        public Color moodColor;         // Warna tema (merah/ungu/emas/biru)
+        public Color moodColor;         // Warna tema badge
         public Color sfxColor;          // Warna teks onomatopoeia
-        public string nextBtnLabel;     // e.g. "▶ Lanjutkan", "⚔ Mulai Misi Stage 1"
-        public bool isClimax;
+        public string nextBtnLabel;     // e.g. "▶ Lanjutkan [SPACE]"
     }
 
     private List<StoryBeat> beats = new List<StoryBeat>();
@@ -125,16 +122,15 @@ public class StoryScene : MonoBehaviour
         btnFantasyPressed= Resources.Load<Sprite>("UI/btn_fantasy_pressed");
         screenVignette   = Resources.Load<Sprite>("UI/screen_vignette");
 
-        // Manhwa Art Sprites
+        // Manhwa 2D Hand-drawn Art Sprites
+        artPeacefulDays    = Resources.Load<Sprite>("UI/Story/manhwa_peaceful_days");
         artAshenvaleFall   = Resources.Load<Sprite>("UI/Story/manhwa_ashenvale_fall");
         artEloraKidnapped  = Resources.Load<Sprite>("UI/Story/manhwa_elora_kidnapped");
         artKaelenAwakening = Resources.Load<Sprite>("UI/Story/manhwa_kaelen_awakening");
         artAncientRuins    = Resources.Load<Sprite>("UI/Story/manhwa_ancient_ruins_rescue");
 
-        portraitKaelen     = Resources.Load<Sprite>("UI/hud_player_portrait");
-        portraitValeria    = Resources.Load<Sprite>("UI/hud_valeria_portrait");
-
-        // Fallback jika belum ada sprite
+        // Fallback jika salah satu null
+        if (artPeacefulDays == null) artPeacefulDays = artAshenvaleFall;
         if (artAshenvaleFall == null) artAshenvaleFall = Resources.Load<Sprite>("UI/menu_background");
         if (artEloraKidnapped == null) artEloraKidnapped = artAshenvaleFall;
         if (artKaelenAwakening == null) artKaelenAwakening = artAshenvaleFall;
@@ -153,98 +149,96 @@ public class StoryScene : MonoBehaviour
         if (isKaelen)
         {
             // ── KISAH KAELEN (THE SHADOW BLADER) ──────────────────────────
+            // Beat 0: Masa Lalu Bahagia
             beats.Add(new StoryBeat {
-                chapterTag    = "EPISODE 0  •  HARI KEHANCURAN",
-                onomatopoeia  = "《 콰아아앙! (KABOOM!) 》",
+                chapterTag    = "PROLOG  •  HARI-HARI DAMAI & BAHAGIA",
+                onomatopoeia  = "《 ♬ 하하호호 (SENYUM & TAWA) 》",
                 speaker       = "NARASI",
-                subtitle      = "10 Tahun Lalu — Di Balik Kabut Gunung Ashenvale",
-                text          = "Dunia runtuh bukan dengan jeritan, melainkan kobaran api yang membakar habis semua kenangan.\n\nKaelen lahir sebagai putra pandai besi biasa. Dia tidak memiliki kekuatan sakti, hanya sebilah palu tempa dan mimpi sederhana: melihat laut lepas bersama adik perempuannya yang paling dicintai, <color=#FFD6A5>Elora</color>.",
-                artSprite     = artAshenvaleFall,
-                moodColor     = new Color(1.0f, 0.55f, 0.20f, 1f), // Oranye Api
-                sfxColor      = new Color(1.0f, 0.40f, 0.15f, 1f),
-                nextBtnLabel  = "▶  Lanjutkan [SPACE]",
-                isClimax      = false
+                subtitle      = "10 Tahun Lalu — Lembah Bunga Ashenvale yang Penuh Kedamaian",
+                text          = "Dahulu kala, sebelum dunia hancur lebur... keluarga kami hidup begitu damai dan bahagia.\n\nAyah adalah pandai besi yang tekun, ibu selalu menyambut kami dengan roti hangat, dan aku bersama adikku tercinta, <color=#FFD6A5>Elora</color>, menghabiskan masa kecil bermain riang di padang bunga pegunungan. Elora tersenyum memeluk mahkota bunga, berjanji kita akan selalu bersama selamanya.",
+                artSprite     = artPeacefulDays,
+                moodColor     = new Color(0.35f, 0.85f, 0.50f, 1f), // Hijau Damai
+                sfxColor      = new Color(1.00f, 0.90f, 0.40f, 1f), // Kuning Cerah
+                nextBtnLabel  = "▶  Lanjutkan [SPACE]"
             });
 
+            // Beat 1: Hingga Pada Suatu Malam (Tragedi Dimulai)
             beats.Add(new StoryBeat {
-                chapterTag    = "EPISODE 1  •  GERBANG ABYSSAL TERBUKA",
-                onomatopoeia  = "《 쿠구구구... (ROAR!) 》",
+                chapterTag    = "EPISODE 1  •  HINGGA PADA SUATU MALAM...",
+                onomatopoeia  = "《 콰아아앙! (KABOOM!) 》",
                 speaker       = "TRAGEDI DESA ASHENVALE",
-                subtitle      = "Malam Merah Darah & Serbuan Pasukan Jurang",
-                text          = "Malam itu... langit terbelah dan tanah memuntahkan jutaan taring neraka.\n\nGerbang Abyssal runtuh tepat di atas desa mereka. Ayah Kaelen gugur tertembus tombak iblis saat menahan pintu rumah. Ibunya lenyap ditelan api neraka. Kaelen memeluk erat tangan Elora sambil berlari sekuat tenaga menembus puing-puing membara.",
+                subtitle      = "Langit Terbelah & Serbuan Pasukan Jurang Abyssal",
+                text          = "Sampai pada suatu malam yang terkutuk... langit tiba-tiba berubah merah darah.\n\nGerbang Abyssal runtuh tepat di atas desa kami. Ribuan monster kegelapan memuntahkan api dan membakar rumah-rumah. Ayah gugur menahan pintu agar kami bisa lari. Ibu lenyap ditelan kobaran api. Dalam sekejap, tawa bahagia kami berganti menjadi jeritan keputusasaan.",
                 artSprite     = artAshenvaleFall,
-                moodColor     = new Color(0.95f, 0.20f, 0.15f, 1f), // Merah Darah
-                sfxColor      = new Color(1.0f, 0.20f, 0.10f, 1f),
-                nextBtnLabel  = "▶  Teruskan...",
-                isClimax      = false
+                moodColor     = new Color(0.95f, 0.25f, 0.15f, 1f), // Merah Api
+                sfxColor      = new Color(1.00f, 0.35f, 0.15f, 1f),
+                nextBtnLabel  = "▶  Teruskan..."
             });
 
+            // Beat 2: Perpisahan yang Menyayat Hati
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 2  •  PERPISAHAN YANG TRAGIS",
                 onomatopoeia  = "《 쩌적—! (SNAP!) 》",
                 speaker       = "KAELEN (MASA LALU)",
                 subtitle      = "Genggaman Tangan yang Terlepas di Hadapan Maut",
-                text          = "\"ELORA! PEGANG TANGANKU! JANGAN LEPASKAN!\"\n\n\"Kakak... larilah... hiduplah untukku...\"\n\nSosok demon bertanduk raksasa merenggut Elora ke dalam pusaran portal ungu kegelapan. Pedang tumpul di tangan Kaelen patah berkeping-keping. Genggaman tangannya terlepas... meninggalkan Kaelen menangis darah di atas abu keluarganya.",
+                text          = "\"ELORA! PEGANG TANGANKU! JANGAN LEPASKAN!\"\n\n\"Kakak... larilah... hiduplah untukku...\"\n\nSosok demon bertanduk bayangan merenggut Elora ke dalam portal kegelapan. Pedang kecil di tangan Kaelen patah berkeping-keping. Genggaman tangan mereka terlepas... meninggalkan Kaelen bersimbah darah di atas tanah abu, menangis dalam keputusasaan yang tak terobati.",
                 artSprite     = artEloraKidnapped,
                 moodColor     = new Color(0.70f, 0.25f, 0.90f, 1f), // Ungu Abyssal
                 sfxColor      = new Color(0.85f, 0.35f, 1.00f, 1f),
-                nextBtnLabel  = "▶  Teruskan...",
-                isClimax      = true
+                nextBtnLabel  = "▶  Teruskan..."
             });
 
+            // Beat 3: Kebangkitan & Sumpah Pedang Bayangan
             beats.Add(new StoryBeat {
                 chapterTag    = "EPISODE 3  •  SUMPAH PEDANG BAYANGAN",
                 onomatopoeia  = "《 샤아아—! (SHADOW AWAKENING) 》",
                 speaker       = "SUMPAH KSATRIA BAYANGAN",
                 subtitle      = "Kelemahan Adalah Dosa Terbesar di Dunia Ini",
-                text          = "Kaelen memohon pertolongan pada Ksatria Suci Kerajaan, namun mereka menolak dan mengejeknya: \"Gadis itu sudah mati. Menyerahlah, bocah abu.\"\n\nDi malam tanpa bintang itu, Kaelen menancapkan pedang berkarat dan menelan pecahan <color=#8060FF>Inti Bayangan Terlarang</color>.\n\n\"Jika dewa dan ksatria suci berpaling... maka aku akan merangkul kegelapan! Aku bersumpah akan menjadi ksatria terkuat dan membelah setiap iblis hingga Elora kembali!\"",
+                text          = "Kaelen memohon pertolongan pada Ksatria Kerajaan, namun mereka menolak dan mengejeknya: \"Adikmu sudah mati. Menyerahlah, bocah abu.\"\n\nDi malam kelam itu, Kaelen menelan serpihan <color=#8060FF>Inti Bayangan Terlarang</color>.\n\n\"Jika dunia dan ksatria suci berpaling... maka aku akan merangkul kegelapan! Aku bersumpah akan menjadi ksatria terkuat di dunia ini, dan aku tidak akan berhenti hingga Elora kembali!\"",
                 artSprite     = artKaelenAwakening,
                 moodColor     = new Color(0.30f, 0.70f, 1.00f, 1f), // Biru Listrik
                 sfxColor      = new Color(0.40f, 0.85f, 1.00f, 1f),
-                nextBtnLabel  = "▶  Menuju Medan Tempur",
-                isClimax      = true
+                nextBtnLabel  = "▶  Menuju Medan Tempur"
             });
 
+            // Beat 4: Petunjuk Penyelamatan Stage 1
             beats.Add(new StoryBeat {
-                chapterTag    = "EPISODE 4  •  PETUNJUK STAGE 1: LEMBAH RERUNTUHAN",
+                chapterTag    = "EPISODE 4  •  PETUNJUK PENYELAMATAN STAGE 1",
                 onomatopoeia  = "《 척! (THE RESCUE BEGINS) 》",
                 speaker       = "PANGGILAN PENYELAMATAN",
-                subtitle      = "Seorang Tawanan Memegang Kunci Lokasi Elora",
-                text          = "10 TAHUN BERLALU — SEUSAI MENAKLUKKAN RAJA SLIME DI HUTAN TERLARANG\n\nKaelen menemukan kabar pasti: Seorang tawanan penyintas dari kuil kuno disekap oleh pasukan iblis di kedalaman <color=#FFD6A5>Lembah Reruntuhan Kuno</color>!\nTawanan ini adalah satu-satunya saksi yang mengetahui ruang rahasia tempat Elora ditawan.\n\n\"Aku tidak akan membiarkan penyesalan yang sama terulang lagi. Bertahanlah, aku datang!\"",
+                subtitle      = "Tawanan Penyintas di Lembah Reruntuhan Kuno",
+                text          = "10 TAHUN BERLALU — SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nKaelen menemukan kabar pasti: Seorang tawanan penyintas dari kuil kuno disekap oleh algojo iblis di kedalaman <color=#FFD6A5>Lembah Reruntuhan Kuno</color>!\nTawanan ini memegang kunci rahasia lokasi ruang tahanan Elora.\n\n\"Bertahanlah sedikit lagi, Elora... Kakak datang untuk menyelamatkanmu!\"",
                 artSprite     = artAncientRuins,
-                moodColor     = new Color(1.0f, 0.85f, 0.35f, 1f), // Emas Harapan
-                sfxColor      = new Color(1.0f, 0.90f, 0.40f, 1f),
-                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1",
-                isClimax      = true
+                moodColor     = new Color(1.00f, 0.85f, 0.35f, 1f), // Emas Harapan
+                sfxColor      = new Color(1.00f, 0.90f, 0.40f, 1f),
+                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1"
             });
         }
         else
         {
             // ── KISAH VALERIA (THE CRIMSON VALKYRIE) ──────────────────────
             beats.Add(new StoryBeat {
-                chapterTag    = "EPISODE 0  •  MAWAR CRIMSON",
-                onomatopoeia  = "《 휘이잉... (COLD BLIZZARD) 》",
+                chapterTag    = "PROLOG  •  HARI-HARI DAMAI PONDOK MAWAR",
+                onomatopoeia  = "《 ♬ 솔솔 (ANGIN SEGAR) 》",
                 speaker       = "NARASI",
-                subtitle      = "15 Tahun Lalu — Badai Salju Perbatasan Timur",
-                text          = "Mawar yang mekar di atas genangan darah tidak pernah mengenal kehangatan mentari.\n\nValeria terlahir dengan mata crimson merah menyala. Keluarganya adalah tabib pengelana yang dicintai rakyat jelata. Kakak laki-lakinya, <color=#FF8080>Lian</color>, selalu melindunginya dari dinginnya malam dengan senyuman hangat.",
-                artSprite     = artAshenvaleFall,
-                moodColor     = new Color(1.0f, 0.50f, 0.60f, 1f),
-                sfxColor      = new Color(1.0f, 0.40f, 0.50f, 1f),
-                nextBtnLabel  = "▶  Lanjutkan [SPACE]",
-                isClimax      = false
+                subtitle      = "15 Tahun Lalu — Pondok Tabib Damai di Perbatasan Timur",
+                text          = "Sebelum salju berlumur darah... keluarga Valeria adalah tabib pengelana yang penuh tawa.\n\nAyah dan ibu meracik obat penyembuh untuk warga desa, sementara kakak laki-lakinya, <color=#FF8080>Lian</color>, selalu menggendong Valeria kecil dan berjanji akan menjaganya dari bahaya apapun. Masa kecil yang hangat dan penuh kasih sayang.",
+                artSprite     = artPeacefulDays,
+                moodColor     = new Color(0.35f, 0.85f, 0.50f, 1f),
+                sfxColor      = new Color(1.00f, 0.90f, 0.40f, 1f),
+                nextBtnLabel  = "▶  Lanjutkan [SPACE]"
             });
 
             beats.Add(new StoryBeat {
-                chapterTag    = "EPISODE 1  •  MALAM PENYERGAPAN BERDARAH",
+                chapterTag    = "EPISODE 1  •  MALAM PENYERGAPAN BADAI SALJU",
                 onomatopoeia  = "《 캉! 캉—! (CLASH!) 》",
                 speaker       = "TRAGEDI KELUARGA VALERIA",
                 subtitle      = "Keserakahan Klan Pembunuh Bayangan",
-                text          = "Demi merebut pusaka <color=#FF5050>Elixir Darah Murni</color>, ordo pembunuh bayaran gelap menyerbu rumah mereka. Ayah dan ibu tewas membeku di depan pintu.\n\nLian menarik Valeria kecil ke dalam lemari tersembunyi dan menguncinya dari luar.\n\"Valeria... jangan menangis. Hiduplah. Untuk kakak!\"",
+                text          = "Sampai pada suatu malam badai salju... ordo pembunuh bayaran gelap menyerbu rumah mereka demi merebut pusaka <color=#FF5050>Elixir Darah Murni</color>.\n\nAyah dan ibu tewas membeku di depan pintu. Lian menarik Valeria kecil ke dalam lemari tersembunyi dan menguncinya dari luar.\n\"Valeria... jangan menangis. Hiduplah. Untuk kakak!\"",
                 artSprite     = artAshenvaleFall,
-                moodColor     = new Color(0.95f, 0.15f, 0.15f, 1f),
-                sfxColor      = new Color(1.0f, 0.20f, 0.20f, 1f),
-                nextBtnLabel  = "▶  Teruskan...",
-                isClimax      = false
+                moodColor     = new Color(0.95f, 0.20f, 0.20f, 1f),
+                sfxColor      = new Color(1.00f, 0.25f, 0.25f, 1f),
+                nextBtnLabel  = "▶  Teruskan..."
             });
 
             beats.Add(new StoryBeat {
@@ -256,8 +250,7 @@ public class StoryScene : MonoBehaviour
                 artSprite     = artEloraKidnapped,
                 moodColor     = new Color(0.70f, 0.15f, 0.40f, 1f),
                 sfxColor      = new Color(0.85f, 0.20f, 0.50f, 1f),
-                nextBtnLabel  = "▶  Teruskan...",
-                isClimax      = true
+                nextBtnLabel  = "▶  Teruskan..."
             });
 
             beats.Add(new StoryBeat {
@@ -267,10 +260,9 @@ public class StoryScene : MonoBehaviour
                 subtitle      = "Meminum Darah Iblis Demi Menjadi Predator Terkuat",
                 text          = "Valeria bertahan hidup belasan tahun di jurang kegelapan dengan meminum darah iblis terkutuk dan melatih pisau kembarnya hingga secepat kilat.\n\n\"Aku telah membuang kelemahan hatiku. Pedang kembarku akan menari dalam darah para pembantai itu hingga Lian kembali ke pelukanku!\"",
                 artSprite     = artKaelenAwakening,
-                moodColor     = new Color(1.0f, 0.20f, 0.25f, 1f),
-                sfxColor      = new Color(1.0f, 0.35f, 0.35f, 1f),
-                nextBtnLabel  = "▶  Menuju Medan Tempur",
-                isClimax      = true
+                moodColor     = new Color(1.00f, 0.20f, 0.25f, 1f),
+                sfxColor      = new Color(1.00f, 0.35f, 0.35f, 1f),
+                nextBtnLabel  = "▶  Menuju Medan Tempur"
             });
 
             beats.Add(new StoryBeat {
@@ -280,10 +272,9 @@ public class StoryScene : MonoBehaviour
                 subtitle      = "Medali Perak Sang Kakak Ditemukan di Reruntuhan Kuno",
                 text          = "SEUSAI MEMBANTAI RAJA SLIME DI HUTAN TERLARANG\n\nValeria menemukan medali perak milik Lian pada salah satu jasad iblis!\nJejak itu mengarah ke <color=#FF8080>Lembah Reruntuhan Kuno</color> — dimana seorang sandera penting disekap oleh algojo iblis. Sandera ini mengetahui lokasi ruang bawah tanah tempat kakaknya disekap!\n\n\"Tunggu aku, Kakak. Siapapun yang menghalangi jalan ini akan kubakar habis!\"",
                 artSprite     = artAncientRuins,
-                moodColor     = new Color(1.0f, 0.80f, 0.30f, 1f),
-                sfxColor      = new Color(1.0f, 0.85f, 0.35f, 1f),
-                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1",
-                isClimax      = true
+                moodColor     = new Color(1.00f, 0.80f, 0.30f, 1f),
+                sfxColor      = new Color(1.00f, 0.85f, 0.35f, 1f),
+                nextBtnLabel  = "⚔  MULAI PENYELAMATAN STAGE 1"
             });
         }
     }
@@ -298,10 +289,19 @@ public class StoryScene : MonoBehaviour
         BuildBottomNavBar();
 
         ShowBeat(0, false);
+        StartCoroutine(FadeInOnStart());
     }
 
     private void FindOrBuildCanvas()
     {
+        // Pastikan EventSystem aktif agar tombol UI selalu dapat diklik
+        if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+        {
+            GameObject esGO = new GameObject("EventSystem");
+            esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        }
+
         canvas = FindObjectOfType<Canvas>();
         if (canvas == null)
         {
@@ -328,6 +328,18 @@ public class StoryScene : MonoBehaviour
         fadeOverlay = fadeGO.AddComponent<Image>();
         fadeOverlay.color = new Color(0f, 0f, 0f, 1f);
         fadeOverlay.raycastTarget = false;
+    }
+
+    private IEnumerator FadeInOnStart()
+    {
+        float elapsed = 0f;
+        while (elapsed < 0.35f)
+        {
+            elapsed += Time.deltaTime;
+            fadeOverlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(1f, 0f, elapsed / 0.35f));
+            yield return null;
+        }
+        fadeOverlay.color = new Color(0f, 0f, 0f, 0f);
     }
 
     private void BuildAtmosphere()
@@ -411,7 +423,7 @@ public class StoryScene : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // CENTRAL MANHWA ARTWORK PANEL (Sesuai Referensi Gambar 2)
+    // CENTRAL MANHWA ARTWORK PANEL (1140 x 540)
     // ─────────────────────────────────────────────────────────────────────
     private void BuildCentralManhwaFrame()
     {
@@ -422,8 +434,8 @@ public class StoryScene : MonoBehaviour
         mfRT.anchorMin = new Vector2(0.5f, 0.5f);
         mfRT.anchorMax = new Vector2(0.5f, 0.5f);
         mfRT.pivot     = new Vector2(0.5f, 0.5f);
-        mfRT.sizeDelta = new Vector2(1120f, 580f);
-        mfRT.anchoredPosition = new Vector2(0f, 85f);
+        mfRT.sizeDelta = new Vector2(1140f, 540f);
+        mfRT.anchoredPosition = new Vector2(0f, 105f);
 
         // Frame Background & Sliced Modal Border
         Image frameBg = manhwaFrameGO.AddComponent<Image>();
@@ -435,7 +447,7 @@ public class StoryScene : MonoBehaviour
         artMaskGO.transform.SetParent(manhwaFrameGO.transform, false);
         RectTransform amRT = artMaskGO.AddComponent<RectTransform>();
         amRT.anchorMin = Vector2.zero; amRT.anchorMax = Vector2.one;
-        amRT.offsetMin = new Vector2(14f, 14f); amRT.offsetMax = new Vector2(-14f, -14f);
+        amRT.offsetMin = new Vector2(12f, 12f); amRT.offsetMax = new Vector2(-12f, -12f);
 
         artMaskGO.AddComponent<Mask>().showMaskGraphic = false;
         artMaskGO.AddComponent<Image>().color = Color.white;
@@ -448,8 +460,8 @@ public class StoryScene : MonoBehaviour
         aiRT.offsetMin = Vector2.zero; aiRT.offsetMax = Vector2.zero;
 
         imgManhwaArt = artImgGO.AddComponent<Image>();
-        imgManhwaArt.sprite = artAshenvaleFall;
-        imgManhwaArt.preserveAspect = false; // Cover frame
+        imgManhwaArt.sprite = artPeacefulDays;
+        imgManhwaArt.preserveAspect = false; // Fit perfectly into container
         imgManhwaArt.color = Color.white;
 
         // Subtle dark gradient vignette over illustration
@@ -463,26 +475,28 @@ public class StoryScene : MonoBehaviour
         {
             Image avi = artVigGO.AddComponent<Image>();
             avi.sprite = screenVignette;
-            avi.color = new Color(0f, 0f, 0f, 0.45f);
+            avi.color = new Color(0f, 0f, 0f, 0.40f);
             avi.raycastTarget = false;
         }
 
-        // Onomatopoeia / SFX Floating Text (ala Manhwa Korea: 콰아아앙!)
+        // Onomatopoeia / SFX Floating Text (ala Manhwa Korea)
         GameObject sfxGO = new GameObject("ManhwaSFX");
         sfxGO.transform.SetParent(manhwaFrameGO.transform, false);
         RectTransform sfxRT = sfxGO.AddComponent<RectTransform>();
         sfxRT.anchorMin = new Vector2(0f, 1f); sfxRT.anchorMax = new Vector2(0f, 1f);
         sfxRT.pivot     = new Vector2(0f, 1f);
-        sfxRT.anchoredPosition = new Vector2(30f, -25f);
-        sfxRT.sizeDelta = new Vector2(480f, 60f);
+        sfxRT.anchoredPosition = new Vector2(30f, -22f);
+        sfxRT.sizeDelta = new Vector2(450f, 50f);
 
         txtManhwaSFX = sfxGO.AddComponent<TextMeshProUGUI>();
         txtManhwaSFX.font = tmpFont;
-        txtManhwaSFX.fontSize = 28f;
+        txtManhwaSFX.fontSize = 26f;
         txtManhwaSFX.fontStyle = FontStyles.Bold | FontStyles.Italic;
-        txtManhwaSFX.color = new Color(1.0f, 0.40f, 0.15f, 1f);
+        txtManhwaSFX.color = new Color(1.0f, 0.85f, 0.35f, 1f);
+        txtManhwaSFX.outlineWidth = 0.25f;
+        txtManhwaSFX.outlineColor = Color.black;
         txtManhwaSFX.characterSpacing = 3f;
-        txtManhwaSFX.text = "《 콰아아앙! (KABOOM!) 》";
+        txtManhwaSFX.text = "《 ♬ 하하호호 (SENYUM & TAWA) 》";
 
         // Chapter / Episode Tag Top-Right
         GameObject tagGO = new GameObject("ChapterTag");
@@ -490,8 +504,8 @@ public class StoryScene : MonoBehaviour
         RectTransform tagRT = tagGO.AddComponent<RectTransform>();
         tagRT.anchorMin = new Vector2(1f, 1f); tagRT.anchorMax = new Vector2(1f, 1f);
         tagRT.pivot     = new Vector2(1f, 1f);
-        tagRT.anchoredPosition = new Vector2(-30f, -25f);
-        tagRT.sizeDelta = new Vector2(400f, 32f);
+        tagRT.anchoredPosition = new Vector2(-30f, -22f);
+        tagRT.sizeDelta = new Vector2(450f, 32f);
 
         txtChapterTag = tagGO.AddComponent<TextMeshProUGUI>();
         txtChapterTag.font = tmpFont;
@@ -500,14 +514,14 @@ public class StoryScene : MonoBehaviour
         txtChapterTag.color = new Color(1f, 0.88f, 0.45f, 1f);
         txtChapterTag.alignment = TextAlignmentOptions.Right;
         txtChapterTag.characterSpacing = 2f;
-        txtChapterTag.text = "EPISODE 0 • HARI KEHANCURAN";
+        txtChapterTag.text = "PROLOG • HARI-HARI DAMAI";
 
         // 4 Corner Gold Diamonds
-        BuildFrameDiamonds(manhwaFrameGO.transform, 560f, 290f);
+        BuildFrameDiamonds(manhwaFrameGO.transform, 570f, 270f);
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // CAPTION & DIALOGUE BOX (Menempel di Bawah Frame Ilustrasi)
+    // CAPTION & DIALOGUE BOX (Proporsional, Rapi, Bebas Offset)
     // ─────────────────────────────────────────────────────────────────────
     private void BuildCaptionDialogueBox()
     {
@@ -518,8 +532,8 @@ public class StoryScene : MonoBehaviour
         cbRT.anchorMin = new Vector2(0.5f, 0.5f);
         cbRT.anchorMax = new Vector2(0.5f, 0.5f);
         cbRT.pivot     = new Vector2(0.5f, 0.5f);
-        cbRT.sizeDelta = new Vector2(1120f, 185f);
-        cbRT.anchoredPosition = new Vector2(0f, -245f);
+        cbRT.sizeDelta = new Vector2(1140f, 210f);
+        cbRT.anchoredPosition = new Vector2(0f, -250f);
 
         Image cbImg = captionBoxGO.AddComponent<Image>();
         if (modalPanelSprite != null) { cbImg.sprite = modalPanelSprite; cbImg.type = Image.Type.Sliced; }
@@ -535,44 +549,45 @@ public class StoryScene : MonoBehaviour
         pRT.anchorMin = new Vector2(0f, 1f); pRT.anchorMax = new Vector2(0f, 1f);
         pRT.pivot     = new Vector2(0f, 1f);
         pRT.anchoredPosition = new Vector2(30f, -14f);
-        pRT.sizeDelta = new Vector2(320f, 34f);
+        pRT.sizeDelta = new Vector2(310f, 32f);
 
         imgSpeakerPill = pillGO.AddComponent<Image>();
         if (btnFantasyNormal != null) { imgSpeakerPill.sprite = btnFantasyNormal; imgSpeakerPill.type = Image.Type.Sliced; }
         imgSpeakerPill.color = new Color(0.85f, 0.60f, 0.20f, 0.95f);
 
-        txtSpeakerBadge = CreateTMP(pillGO.transform, "TxtBadge", 14.5f, FontStyles.Bold,
+        txtSpeakerBadge = CreateTMP(pillGO.transform, "TxtBadge", 13f, FontStyles.Bold,
             new Color(0.06f, 0.04f, 0.08f, 1f), TextAlignmentOptions.Center);
         txtSpeakerBadge.rectTransform.anchorMin = Vector2.zero; txtSpeakerBadge.rectTransform.anchorMax = Vector2.one;
         txtSpeakerBadge.rectTransform.offsetMin = Vector2.zero; txtSpeakerBadge.rectTransform.offsetMax = Vector2.zero;
         txtSpeakerBadge.characterSpacing = 2f;
-        txtSpeakerBadge.text = "[ KAELEN ]";
+        txtSpeakerBadge.text = "[ NARASI ]";
 
         // Subtitle Context (Di samping speaker pill)
-        txtChapterSubtitle = CreateTMP(captionBoxGO.transform, "TxtSubtitle", 13.5f, FontStyles.Italic,
+        txtChapterSubtitle = CreateTMP(captionBoxGO.transform, "TxtSubtitle", 13f, FontStyles.Italic,
             new Color(0.85f, 0.80f, 0.70f, 0.85f), TextAlignmentOptions.Left);
         txtChapterSubtitle.rectTransform.anchorMin = new Vector2(0f, 1f); txtChapterSubtitle.rectTransform.anchorMax = new Vector2(1f, 1f);
         txtChapterSubtitle.rectTransform.pivot     = new Vector2(0f, 1f);
-        txtChapterSubtitle.rectTransform.anchoredPosition = new Vector2(370f, -16f);
-        txtChapterSubtitle.rectTransform.sizeDelta = new Vector2(-400f, 30f);
-        txtChapterSubtitle.text = "10 Tahun Lalu — Di Balik Kabut Ashenvale";
+        txtChapterSubtitle.rectTransform.anchoredPosition = new Vector2(360f, -15f);
+        txtChapterSubtitle.rectTransform.sizeDelta = new Vector2(-390f, 30f);
+        txtChapterSubtitle.text = "10 Tahun Lalu — Lembah Bunga Ashenvale";
 
         // Narrative / Dialogue Body Text
         GameObject bodyGO = new GameObject("NarrativeBody");
         bodyGO.transform.SetParent(captionBoxGO.transform, false);
         RectTransform bRT = bodyGO.AddComponent<RectTransform>();
         bRT.anchorMin = Vector2.zero; bRT.anchorMax = Vector2.one;
-        bRT.offsetMin = new Vector2(32f, 16f);
-        bRT.offsetMax = new Vector2(-32f, -54f);
+        bRT.offsetMin = new Vector2(30f, 14f);
+        bRT.offsetMax = new Vector2(-30f, -52f);
 
         txtNarrativeDialogue = bodyGO.AddComponent<TextMeshProUGUI>();
         txtNarrativeDialogue.font = tmpFont;
-        txtNarrativeDialogue.fontSize = 20.5f;
+        txtNarrativeDialogue.fontSize = 19f;
         txtNarrativeDialogue.fontStyle = FontStyles.Normal;
         txtNarrativeDialogue.color = new Color(1f, 0.95f, 0.90f, 1f);
         txtNarrativeDialogue.alignment = TextAlignmentOptions.Left;
         txtNarrativeDialogue.enableWordWrapping = true;
-        txtNarrativeDialogue.lineSpacing = 10f;
+        txtNarrativeDialogue.lineSpacing = 6f;
+        txtNarrativeDialogue.overflowMode = TextOverflowModes.Truncate;
         txtNarrativeDialogue.richText = true;
     }
 
@@ -587,8 +602,8 @@ public class StoryScene : MonoBehaviour
         RectTransform nbRT = navBar.AddComponent<RectTransform>();
         nbRT.anchorMin = new Vector2(0.5f, 0f); nbRT.anchorMax = new Vector2(0.5f, 0f);
         nbRT.pivot     = new Vector2(0.5f, 0f);
-        nbRT.sizeDelta = new Vector2(1120f, 60f);
-        nbRT.anchoredPosition = new Vector2(0f, 25f);
+        nbRT.sizeDelta = new Vector2(1140f, 54f);
+        nbRT.anchoredPosition = new Vector2(0f, 18f);
 
         // 1. Button PREV [ ◄ SEBELUMNYA ]
         GameObject prevGO = new GameObject("BtnPrev");
@@ -596,7 +611,7 @@ public class StoryScene : MonoBehaviour
         RectTransform pRT = prevGO.AddComponent<RectTransform>();
         pRT.anchorMin = new Vector2(0f, 0.5f); pRT.anchorMax = new Vector2(0f, 0.5f);
         pRT.pivot     = new Vector2(0f, 0.5f);
-        pRT.sizeDelta = new Vector2(210f, 48f);
+        pRT.sizeDelta = new Vector2(210f, 46f);
         pRT.anchoredPosition = new Vector2(0f, 0f);
 
         Image pImg = prevGO.AddComponent<Image>();
@@ -606,7 +621,7 @@ public class StoryScene : MonoBehaviour
         btnPrev = prevGO.AddComponent<Button>();
         btnPrev.onClick.AddListener(OnPrevClicked);
 
-        TMP_Text pTxt = CreateTMP(prevGO.transform, "Lbl", 15f, FontStyles.Bold,
+        TMP_Text pTxt = CreateTMP(prevGO.transform, "Lbl", 14f, FontStyles.Bold,
             new Color(0.90f, 0.85f, 0.75f, 1f), TextAlignmentOptions.Center);
         pTxt.rectTransform.anchorMin = Vector2.zero; pTxt.rectTransform.anchorMax = Vector2.one;
         pTxt.rectTransform.offsetMin = Vector2.zero; pTxt.rectTransform.offsetMax = Vector2.zero;
@@ -618,7 +633,7 @@ public class StoryScene : MonoBehaviour
         RectTransform nRT = nextGO.AddComponent<RectTransform>();
         nRT.anchorMin = new Vector2(1f, 0.5f); nRT.anchorMax = new Vector2(1f, 0.5f);
         nRT.pivot     = new Vector2(1f, 0.5f);
-        nRT.sizeDelta = new Vector2(340f, 52f);
+        nRT.sizeDelta = new Vector2(340f, 50f);
         nRT.anchoredPosition = new Vector2(0f, 0f);
 
         Image nImg = nextGO.AddComponent<Image>();
@@ -628,7 +643,7 @@ public class StoryScene : MonoBehaviour
         btnNext = nextGO.AddComponent<Button>();
         btnNext.onClick.AddListener(OnNextClicked);
 
-        txtBtnNextLabel = CreateTMP(nextGO.transform, "Lbl", 17f, FontStyles.Bold,
+        txtBtnNextLabel = CreateTMP(nextGO.transform, "Lbl", 16f, FontStyles.Bold,
             new Color(1f, 0.92f, 0.65f, 1f), TextAlignmentOptions.Center);
         txtBtnNextLabel.rectTransform.anchorMin = Vector2.zero; txtBtnNextLabel.rectTransform.anchorMax = Vector2.one;
         txtBtnNextLabel.rectTransform.offsetMin = Vector2.zero; txtBtnNextLabel.rectTransform.offsetMax = Vector2.zero;
