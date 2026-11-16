@@ -463,20 +463,20 @@ public class BossAI : Entity
         skill3Timer = skill3Cooldown;
         rb.velocity = Vector2.zero;
 
-        FlipToPlayer();
-        float faceDir = transform.localScale.x < 0 ? 1f : -1f;
+        ForceFacePlayer();
+        float faceDir = player != null && player.position.x < transform.position.x ? -1f : 1f;
 
         // ─────────────────────────────────────────────────────────────────────
-        // FASE 1: 3x AYUNAN PEDANG MELONTARKAN BOLA API MAGMA TEBAL
+        // FASE 1: 3x AYUNAN PEDANG MELONTARKAN BOLA API MAGMA (CLEAVE)
         // ─────────────────────────────────────────────────────────────────────
         int orbCount = 3;
         for (int i = 0; i < orbCount; i++)
         {
             if (isDead) break;
 
-            // Pastikan arah hadap selalu mengarah ke player
-            FlipToPlayer();
-            faceDir = transform.localScale.x < 0 ? 1f : -1f;
+            // Pastikan bos selalu menghadap player
+            ForceFacePlayer();
+            faceDir = player != null && player.position.x < transform.position.x ? -1f : 1f;
 
             // 1. Bos aktif mengangkat dan mengayunkan pedang raksasa (`Cleave` trigger penuh)
             if (anim != null)
@@ -495,7 +495,6 @@ public class BossAI : Entity
             if (isDead) break;
 
             // 2. DETIK PENEBASAN: Bola api magma raksasa terlontar dari ujung pedang!
-            // Posisi ujung pedang saat menebas: y = -0.4f (ketinggian dada/pedang)
             Vector3 swordTipPos = transform.position + new Vector3(faceDir * 1.5f, -0.4f, 0f);
 
             // Flash api di ujung pedang saat bola terlontar
@@ -521,17 +520,16 @@ public class BossAI : Entity
         if (isDead) { isAttacking = false; yield break; }
 
         // ─────────────────────────────────────────────────────────────────────
-        // FASE 2: SEMBURAN LAHAR VULKANIK PADAT & TEBAL (TEPAT DI LANTAI & PLAYER)
+        // FASE 2: SEMBURAN LAHAR VULKANIK (MOLTEN MAGMA BREATH TORRENT)
         // ─────────────────────────────────────────────────────────────────────
-        FlipToPlayer();
-        faceDir = transform.localScale.x < 0 ? 1f : -1f;
+        ForceFacePlayer();
+        faceDir = player != null && player.position.x < transform.position.x ? -1f : 1f;
 
         // Suara raungan monster keras
         if (roarSound != null && audioSource != null)
             audioSource.PlayOneShot(roarSound, 1.4f);
 
         // 1. ANICANG-ANCANG RAUNGAN (Mouth opening progressive sequence)
-        // Matikan animator sementara agar frame raungan mulut terbuka penuh tidak di-override oleh animator
         if (anim != null) anim.enabled = false;
 
         if (roarAnimSprites != null && roarAnimSprites.Length >= 6 && sr != null)
@@ -554,74 +552,48 @@ public class BossAI : Entity
             yield break;
         }
 
-        // 2. POSISI SEMBURAN: Mulut bos di y = -0.38f (menembak langsung ke arah tubuh player & lantai)
-        Vector3 mouthPos = transform.position + new Vector3(faceDir * 1.05f, -0.38f, 0f);
+        // 2. POSISI SEMBURAN: Mulut bos tepat di depan kepala (menembak langsung ke arah player)
+        Vector3 mouthPos = transform.position + new Vector3(faceDir * 1.0f, -0.2f, 0f);
         float floorLevelY = transform.position.y - 1.4f;
         Vector3 originalBodyPos = transform.position;
 
-        // 3. SPAWN ARUS LAHAR RAKSASA MENYATU (CONTINUOUS THICK MAGMA STREAM)
-        GameObject beamGO = null;
-        SpriteRenderer beamSR = null;
-        GameObject coreGO = null;
-        SpriteRenderer coreSR = null;
-
-        if (fxLavaStreamBody != null)
-        {
-            beamGO = new GameObject("Boss_MagmaBreathStream");
-            beamGO.transform.position = mouthPos;
-            beamGO.transform.rotation = Quaternion.Euler(0f, 0f, -8f * faceDir);
-            beamSR = beamGO.AddComponent<SpriteRenderer>();
-            beamSR.sprite = fxLavaStreamBody;
-            beamSR.sortingLayerName = sr != null ? sr.sortingLayerName : "Default";
-            beamSR.sortingOrder = (sr != null ? sr.sortingOrder : 0) + 2;
-            Material additiveMat = Resources.Load<Material>("Materials/UnlitAdditive");
-            if (additiveMat != null) beamSR.material = additiveMat;
-
-            // Core beam (lapisan tengah menyala putih-kuning membara di dalam arus lahar)
-            coreGO = new GameObject("Boss_MagmaBreathCore");
-            coreGO.transform.SetParent(beamGO.transform, false);
-            coreGO.transform.localPosition = Vector3.zero;
-            coreGO.transform.localRotation = Quaternion.identity;
-            coreGO.transform.localScale = new Vector3(0.96f, 0.55f, 1f);
-            coreSR = coreGO.AddComponent<SpriteRenderer>();
-            coreSR.sprite = fxLavaStreamBody;
-            coreSR.sortingLayerName = beamSR.sortingLayerName;
-            coreSR.sortingOrder = beamSR.sortingOrder + 1;
-            coreSR.color = new Color(1f, 0.95f, 0.65f, 0.95f);
-            if (additiveMat != null) coreSR.material = additiveMat;
-        }
-
-        // 4. Durasi Semburan: 2.3 Detik penuh!
-        // - Mulut bos aktif bergetar meraung (demon_roar_4 & demon_roar_5 bergantian)
+        // 3. Durasi Semburan: 2.4 Detik penuh!
+        // - Mulut bos aktif bergetar meraung (demon_roar_4 & demon_roar_5 bergantian cepat)
         // - Tubuh bos bergetar hebat (violent recoil shake)
-        // - Arus lahar menyembur terus-menerus melintang di tanah hingga 8.5 unit
+        // - 40 partikel lahar mengalir per detik menukik dari mulut membanjiri lantai & player
         // - Kolam lahar mendidih muncul di sepanjang tanah
-        float breathDuration  = 2.3f;
-        float breathElapsed   = 0f;
-        float torrentSpawnCd  = 0.05f; // Semburan magma padat tiap 0.05 detik
-        float torrentTimer    = 0f;
-        float damageTickCd    = 0.15f; // Damage tick multi-hit cepat
-        float damageTimer     = 0f;
-        float maxStreamRange  = 8.5f;
+        float breathDuration   = 2.4f;
+        float breathElapsed    = 0f;
+        float streamDropCd     = 0.025f; // Semburan partikel lahar tiap 0.025s (40 drops/s)
+        float streamDropTimer  = 0f;
+        float muzzleCd         = 0.07f;  // Letupan api di bibir mulut
+        float muzzleTimer      = 0f;
+        float poolCd           = 0.12f;  // Kolam lahar di tanah
+        float poolTimer        = 0f;
+        float damageTickCd     = 0.15f;  // Damage tick multi-hit cepat
+        float damageTimer      = 0f;
+        float maxStreamRange   = 8.5f;
 
         while (breathElapsed < breathDuration)
         {
             if (isDead) break;
 
-            breathElapsed += Time.deltaTime;
-            torrentTimer  += Time.deltaTime;
-            damageTimer   += Time.deltaTime;
+            breathElapsed    += Time.deltaTime;
+            streamDropTimer  += Time.deltaTime;
+            muzzleTimer      += Time.deltaTime;
+            poolTimer        += Time.deltaTime;
+            damageTimer      += Time.deltaTime;
 
-            // ANIMASI MULUT MERAUNG: Bergantian demon_roar_4 & demon_roar_5 tiap 0.10s
+            // ANIMASI MULUT MERAUNG: Bergantian demon_roar_4 & demon_roar_5 tiap 0.08s
             if (sr != null && roarAnimSprites != null && roarAnimSprites.Length >= 6)
             {
-                int fIdx = ((int)(breathElapsed * 10f) % 2 == 0) ? 3 : 4;
+                int fIdx = ((int)(breathElapsed * 12f) % 2 == 0) ? 3 : 4;
                 if (roarAnimSprites[fIdx] != null) sr.sprite = roarAnimSprites[fIdx];
             }
 
             // ANIMASI GETARAN TUBUH (Violent recoil shudder saat memuntahkan lahar)
-            float shakeX = Random.Range(-0.07f, 0.07f);
-            float shakeY = Random.Range(-0.05f, 0.05f);
+            float shakeX = Random.Range(-0.06f, 0.06f);
+            float shakeY = Random.Range(-0.04f, 0.04f);
             transform.position = originalBodyPos + new Vector3(shakeX, shakeY, 0f);
 
             // Warna tubuh berdenyut panas membakar
@@ -631,46 +603,30 @@ public class BossAI : Entity
                 sr.color = Color.Lerp(new Color(2.2f, 0.5f, 0.1f, 1f), new Color(1.3f, 0.1f, 0.0f, 1f), p);
             }
 
-            // UPDATE ARUS LAHAR (Wave pulsing tebal menyembur)
-            if (beamGO != null)
+            // SEMBURAN ARUS LAHAR: Semburkan partikel magma bertekanan tinggi setiap 0.025s
+            if (streamDropTimer >= streamDropCd)
             {
-                beamGO.transform.position = mouthPos + new Vector3(shakeX, shakeY, 0f);
-                float wave = 1.0f + Mathf.Sin(breathElapsed * 24f) * 0.14f;
-                beamGO.transform.localScale = new Vector3(faceDir * 1.1f, 1.30f * wave, 1f);
-
-                if (beamSR != null)
-                {
-                    float colorP = (Mathf.Sin(breathElapsed * 16f) + 1f) * 0.5f;
-                    beamSR.color = Color.Lerp(new Color(1f, 0.55f, 0.1f, 0.95f), new Color(1f, 0.85f, 0.3f, 1f), colorP);
-                }
+                streamDropTimer = 0f;
+                Vector3 sprayOrigin = mouthPos + new Vector3(shakeX, shakeY, 0f);
+                StartCoroutine(LavaStreamDropRoutine(sprayOrigin, faceDir, floorLevelY));
             }
 
-            // SEMBURAN LAHAR TEBAL: Partikel magma melesat cepat + kolam lahar panas
-            if (torrentTimer >= torrentSpawnCd)
+            // LETUPAN API DI BIBIR MULUT (Muzzle blast)
+            if (muzzleTimer >= muzzleCd)
             {
-                torrentTimer = 0f;
-
-                // Tembakkan partikel lahar deras menyusuri tanah
-                float sprayDist = Random.Range(1.2f, maxStreamRange);
-                float sprayY    = Mathf.Lerp(mouthPos.y, floorLevelY + 0.3f, sprayDist / maxStreamRange) + Random.Range(-0.2f, 0.2f);
-                Vector3 sprayPos = new Vector3(transform.position.x + faceDir * sprayDist, sprayY, 0f);
-
-                // Gumpalan lahar padat menyala di jalur semburan
-                SpawnFX(sprayPos,
-                        fxThickFireball != null ? fxThickFireball : fxLavaSplash,
-                        new Vector3(Random.Range(0.85f, 1.25f), Random.Range(0.75f, 1.1f), 1f),
-                        faceDir * Random.Range(-15f, 15f),
-                        0.25f,
-                        new Color(1f, 0.75f, 0.2f, 0.95f));
-
-                // Muzzle burst di mulut bos
+                muzzleTimer = 0f;
                 SpawnFX(mouthPos, fxLavaSplash,
-                        new Vector3(0.75f, 0.85f, 1f),
-                        faceDir * Random.Range(-25f, 25f), 0.18f,
-                        new Color(1f, 0.8f, 0.3f, 0.9f));
+                        new Vector3(0.85f, 1.0f, 1f),
+                        faceDir * Random.Range(-25f, 25f), 0.16f,
+                        new Color(1f, 0.85f, 0.25f, 1f));
+            }
 
-                // Kolam lahar mendidih di tanah tepat di bawah semburan
-                Vector3 poolPos = new Vector3(sprayPos.x, floorLevelY, 0f);
+            // KOLAM LAHAR MENDIDIH DI TANAH
+            if (poolTimer >= poolCd)
+            {
+                poolTimer = 0f;
+                float rDist = Random.Range(1.5f, maxStreamRange);
+                Vector3 poolPos = new Vector3(transform.position.x + faceDir * rDist, floorLevelY, 0f);
                 SpawnFX(poolPos, fxLavaPool,
                         new Vector3(Random.Range(1.4f, 2.0f), 0.75f, 1f),
                         0f, 1.2f,
@@ -679,7 +635,7 @@ public class BossAI : Entity
 
             // Getaran kamera terus-menerus selama semburan
             if (CameraFollow.instance != null)
-                CameraFollow.instance.TriggerScreenShake(0.15f, 0.16f);
+                CameraFollow.instance.TriggerScreenShake(0.14f, 0.16f);
 
             // Suara semburan api berkobar
             if (attackSound != null && audioSource != null && Random.value < 0.28f)
@@ -711,9 +667,6 @@ public class BossAI : Entity
             yield return null;
         }
 
-        // Hancurkan objek arus lahar
-        if (beamGO != null) Destroy(beamGO);
-
         // Kembalikan posisi dan warna badan bos ke normal
         transform.position = originalBodyPos;
         if (sr != null) sr.color = originalColor;
@@ -732,7 +685,7 @@ public class BossAI : Entity
             anim.Play("BosIdle");
         }
 
-        // Ledakan penutup dahsyat di ujung semburan
+        // LETUSAN PILAR LAHAR PENUTUP (3 pilar magma meletus dari tanah!)
         if (!isDead)
         {
             if (attackSound != null && audioSource != null)
@@ -741,16 +694,99 @@ public class BossAI : Entity
             if (CameraFollow.instance != null)
                 CameraFollow.instance.TriggerScreenShake(0.40f, 0.35f);
 
-            Vector3 endBlastPos = new Vector3(transform.position.x + faceDir * (maxStreamRange * 0.75f), floorLevelY + 0.4f, 0f);
-            SpawnFX(endBlastPos, fxLavaSplash, new Vector3(1.8f, 2.2f, 1f), 0f, 0.55f,
-                    new Color(1f, 0.6f, 0.15f, 1f), true, 1.25f);
-            SpawnFX(new Vector3(endBlastPos.x, floorLevelY, 0f), fxLavaPool, new Vector3(3.5f, 1.2f, 1f), 0f, 2.0f,
-                    new Color(1f, 0.25f, 0.0f, 0.90f), true, 1.1f);
+            for (int p = 1; p <= 3; p++)
+            {
+                float pillarDist = p * 2.4f;
+                Vector3 pillarPos = new Vector3(transform.position.x + faceDir * pillarDist, floorLevelY, 0f);
+
+                SpawnFX(pillarPos, fxLavaPillar != null ? fxLavaPillar : fxLavaSplash,
+                        new Vector3(1.2f, 1.6f, 1f), 0f, 0.55f,
+                        new Color(1f, 0.7f, 0.15f, 1f), true, 1.2f);
+
+                SpawnFX(pillarPos, fxLavaPool, new Vector3(2.5f, 1.0f, 1f), 0f, 2.0f,
+                        new Color(1f, 0.25f, 0.0f, 0.90f), true, 1.1f);
+            }
         }
 
-        FlipToPlayer();
+        ForceFacePlayer();
         yield return new WaitForSeconds(0.35f);
         isAttacking = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PARTIKEL ALIRAN LAHAR (FLUID MAGMA STREAM PARTICLE)
+    // ─────────────────────────────────────────────────────────────────────────
+    private IEnumerator LavaStreamDropRoutine(Vector3 startPos, float dir, float floorY)
+    {
+        GameObject drop = new GameObject("LavaStreamParticle");
+        drop.transform.position = startPos;
+        drop.transform.localScale = Vector3.one * 0.40f;
+
+        SpriteRenderer dropSR = drop.AddComponent<SpriteRenderer>();
+        dropSR.sprite = (Random.value < 0.65f && fxLavaBall != null) ? fxLavaBall : fxLavaSplash;
+        dropSR.sortingLayerName = sr != null ? sr.sortingLayerName : "Default";
+        dropSR.sortingOrder = (sr != null ? sr.sortingOrder : 0) + 3;
+
+        Material mat = Resources.Load<Material>("Materials/UnlitAdditive");
+        if (mat != null) dropSR.material = mat;
+
+        dropSR.color = Color.Lerp(new Color(1f, 0.95f, 0.4f, 1f), new Color(1f, 0.45f, 0.05f, 1f), Random.value);
+
+        float speedX = dir * Random.Range(11.0f, 16.5f);
+        float speedY = Random.Range(-0.5f, 1.2f);
+        float gravity = 10f;
+        float maxLife = 0.60f;
+        float elapsed = 0f;
+
+        Vector3 curPos = startPos;
+        float finalScale = Random.Range(1.1f, 1.55f);
+
+        while (elapsed < maxLife)
+        {
+            float dt = Time.deltaTime;
+            elapsed += dt;
+
+            speedY -= gravity * dt;
+            curPos.x += speedX * dt;
+            curPos.y += speedY * dt;
+            drop.transform.position = curPos;
+
+            float t = elapsed / maxLife;
+            float currentScale = Mathf.Lerp(0.40f, finalScale, t);
+            drop.transform.localScale = Vector3.one * currentScale;
+
+            drop.transform.Rotate(0f, 0f, (speedX > 0 ? -360f : 360f) * dt);
+
+            if (curPos.y <= floorY + 0.15f)
+            {
+                SpawnFX(new Vector3(curPos.x, floorY, 0f), fxLavaPool,
+                        new Vector3(Random.Range(1.2f, 1.8f), 0.6f, 1f),
+                        0f, 1.2f,
+                        new Color(1f, 0.35f, 0.0f, 0.85f), true, 1.05f);
+
+                SpawnFX(new Vector3(curPos.x, floorY + 0.3f, 0f), fxLavaSplash,
+                        new Vector3(0.7f, 0.9f, 1f),
+                        dir * Random.Range(-20f, 20f), 0.22f,
+                        new Color(1f, 0.7f, 0.2f, 1f));
+                break;
+            }
+
+            Collider2D pHit = Physics2D.OverlapCircle(curPos, 0.60f, playerLayer);
+            if (pHit != null)
+            {
+                Entity ent = pHit.GetComponent<Entity>();
+                if (ent != null)
+                {
+                    ent.TakeDamage(Mathf.Max(3, skill3BreathDmg / 2), false);
+                    SpawnFX(curPos, fxLavaSplash, Vector3.one * 0.7f, 0f, 0.18f, new Color(1f, 0.8f, 0.2f, 1f));
+                }
+                break;
+            }
+
+            yield return null;
+        }
+
+        Destroy(drop);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -763,7 +799,7 @@ public class BossAI : Entity
         orbGO.transform.localScale = new Vector3(1.15f, 1.15f, 1f);
 
         SpriteRenderer srOrb = orbGO.AddComponent<SpriteRenderer>();
-        srOrb.sprite = fxThickFireball != null ? fxThickFireball : fxLavaBall;
+        srOrb.sprite = fxLavaBall != null ? fxLavaBall : fxLavaSplash;
         srOrb.color  = new Color(1f, 0.9f, 0.35f, 1f);
         srOrb.sortingOrder = 53;
 
@@ -1022,10 +1058,16 @@ public class BossAI : Entity
     private void FlipToPlayer()
     {
         if (isAttacking || player == null) return;
+        ForceFacePlayer();
+    }
+
+    private void ForceFacePlayer()
+    {
+        if (player == null) return;
         float d = player.position.x - transform.position.x;
         float s = Mathf.Clamp(bossScale, 1.5f, 2.0f);
-        if (d >  0.1f) transform.localScale = new Vector3(-s, s, 1f);
-        if (d < -0.1f) transform.localScale = new Vector3(s,  s, 1f);
+        if (d >= 0f) transform.localScale = new Vector3(-s, s, 1f); // Menghadap kanan ke player
+        else         transform.localScale = new Vector3(s,  s, 1f); // Menghadap kiri ke player
     }
 
     private void MoveToPlayer(float dir)
