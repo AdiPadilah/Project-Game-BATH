@@ -402,16 +402,45 @@ public class CharacterSelectScene : MonoBehaviour
         RectTransform lbRT = loreBox.AddComponent<RectTransform>();
         lbRT.anchorMin = new Vector2(0.5f, 0f); lbRT.anchorMax = new Vector2(0.5f, 0f);
         lbRT.pivot     = new Vector2(0.5f, 0f);
-        lbRT.anchoredPosition = new Vector2(0f, 25f);
-        lbRT.sizeDelta = new Vector2(420f, 120f);
+        lbRT.anchoredPosition = new Vector2(0f, 52f);
+        lbRT.sizeDelta = new Vector2(420f, 92f);
 
         Image lbImg = loreBox.AddComponent<Image>();
         lbImg.color = new Color(0.08f, 0.05f, 0.16f, 0.70f);
 
-        txtHeroLore = CreateTMP(loreBox.transform, "TxtLore", 12.5f, FontStyles.Normal,
+        txtHeroLore = CreateTMP(loreBox.transform, "TxtLore", 12f, FontStyles.Normal,
             new Color(0.85f, 0.82f, 0.76f, 1f), TextAlignmentOptions.Center);
         txtHeroLore.rectTransform.anchorMin = Vector2.zero; txtHeroLore.rectTransform.anchorMax = Vector2.one;
-        txtHeroLore.rectTransform.offsetMin = new Vector2(16f, 10f); txtHeroLore.rectTransform.offsetMax = new Vector2(-16f, -10f);
+        txtHeroLore.rectTransform.offsetMin = new Vector2(16f, 6f); txtHeroLore.rectTransform.offsetMax = new Vector2(-16f, -6f);
+
+        // Tombol Baca Kisah Manhwa
+        GameObject btnStoryGO = new GameObject("BtnReadStory");
+        btnStoryGO.transform.SetParent(leftCol.transform, false);
+        RectTransform bsRT = btnStoryGO.AddComponent<RectTransform>();
+        bsRT.anchorMin = new Vector2(0.5f, 0f); bsRT.anchorMax = new Vector2(0.5f, 0f);
+        bsRT.pivot     = new Vector2(0.5f, 0f);
+        bsRT.anchoredPosition = new Vector2(0f, 15f);
+        bsRT.sizeDelta = new Vector2(280f, 32f);
+
+        Image bsImg = btnStoryGO.AddComponent<Image>();
+        if (btnFantasyNormal != null) { bsImg.sprite = btnFantasyNormal; bsImg.type = Image.Type.Sliced; }
+        bsImg.color = new Color(0.20f, 0.15f, 0.30f, 0.90f);
+
+        Button bsBtn = btnStoryGO.AddComponent<Button>();
+        bsBtn.onClick.AddListener(() => {
+            PlayClick();
+            PlayerPrefs.SetString("SelectedCharacterName", characters[currentIndex].name);
+            PlayerPrefs.SetInt("SelectedCharacterID", currentIndex);
+            PlayerPrefs.SetString("TargetSceneName", "CharacterSelect");
+            PlayerPrefs.Save();
+            SceneManager.LoadScene("StoryScene");
+        });
+
+        TMP_Text bsTxt = CreateTMP(btnStoryGO.transform, "Label", 12.5f, FontStyles.Bold,
+            new Color(1f, 0.88f, 0.40f, 1f), TextAlignmentOptions.Center);
+        bsTxt.rectTransform.anchorMin = Vector2.zero; bsTxt.rectTransform.anchorMax = Vector2.one;
+        bsTxt.rectTransform.offsetMin = Vector2.zero; bsTxt.rectTransform.offsetMax = Vector2.zero;
+        bsTxt.text = "[ 📖 BACA KISAH & ASAL-USUL ]";
 
         // ── KOLOM KANAN: SKILL SHOWCASE (Lebar: 700, Tinggi: 540) ────────────
         GameObject rightCol = new GameObject("Col_Right_Skills");
@@ -778,6 +807,11 @@ public class CharacterSelectScene : MonoBehaviour
             float bob = Mathf.Sin(Time.time * 2.2f) * 4f;
             portraitRT.anchoredPosition = new Vector2(0f, -40f + bob);
         }
+    }
+
+    private void PlayClick()
+    {
+        if (audioSource != null && sfxClick != null) audioSource.PlayOneShot(sfxClick);
     }
 
     private void OnPlayClicked()

@@ -177,6 +177,29 @@ public class StageObjectiveOverlay : MonoBehaviour
         string diffTitle = DifficultyManager.GetDifficultyTitle(DifficultyManager.CurrentDifficulty);
         Color diffColor  = DifficultyManager.GetDifficultyColor(DifficultyManager.CurrentDifficulty);
 
+        string stageName  = PlayerPrefs.GetString("TargetStageName", "LEMBAH RERUNTUHAN KUNO");
+        string heroName   = PlayerPrefs.GetString("SelectedCharacterName", "Kaelen");
+        string currentSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+        // Tentukan konten briefing berdasarkan scene aktif
+        bool isGamePlay = (currentSceneName == "GamePlay");
+        string briefingTitle    = isGamePlay ? "THE AWAKENING" : stageName;
+        string narrativeText    = isGamePlay
+            ? "\"Ini hanya awal... kekuatan sejati tersimpan di balik kegelapan yang lebih dalam.\"\n— Suara misterius dari balik kabut"
+            : "Seorang pedagang telah ditawan oleh pasukan monster di reruntuhan kuno. Ia memegang petunjuk lokasi seseorang yang sangat berarti bagimu. Jangan biarkan nyawanya berakhir di sana.";
+
+        string[] objectivesList = isGamePlay
+            ? new string[] {
+                "<b>OBJEKTIF:</b>  Latihan tempur — kuasai semua teknik dasar",
+                "<b>OBJEKTIF:</b>  Kalahkan Raja Monster Slime di ujung hutan",
+                "<b>TIPS:</b>  Gunakan skill [A], [S], [W] untuk combo mematikan"
+              }
+            : new string[] {
+                "<b>OBJEKTIF UTAMA:</b>  Selamatkan Pedagang Tua dari penjara monster",
+                "<b>OBJEKTIF TEMPUR:</b>  Basmi semua penjaga monster di reruntuhan",
+                "<b>OBJEKTIF RAHASIA:</b>  Temukan petunjuk lokasi orang yang kau cari"
+              };
+
         TMP_Text txtHeader = CreateTMP(briefingModal.transform, "TxtHeader", 15f, FontStyles.Bold,
             diffColor, TextAlignmentOptions.Center);
         RectTransform hRT = txtHeader.rectTransform;
@@ -184,7 +207,7 @@ public class StageObjectiveOverlay : MonoBehaviour
         hRT.pivot     = new Vector2(0.5f, 1f);
         hRT.anchoredPosition = new Vector2(0f, -22f);
         hRT.sizeDelta = new Vector2(0f, 26f);
-        txtHeader.text = $"✦ SASARAN MISI: STAGE 1  •  [{diffTitle}] ✦";
+        txtHeader.text = $"✦ SASARAN MISI: {briefingTitle.ToUpper()}  •  [{diffTitle}] ✦";
 
         // Stage Title
         TMP_Text txtTitle = CreateTMP(briefingModal.transform, "TxtTitle", 28f, FontStyles.Bold,
@@ -194,7 +217,7 @@ public class StageObjectiveOverlay : MonoBehaviour
         titleRT.pivot     = new Vector2(0.5f, 1f);
         titleRT.anchoredPosition = new Vector2(0f, -54f);
         titleRT.sizeDelta = new Vector2(-60f, 38f);
-        txtTitle.text = "LEMBAH RERUNTUHAN KUNO";
+        txtTitle.text = briefingTitle;
 
         // Hero Info Badge
         TMP_Text txtHeroInfo = CreateTMP(briefingModal.transform, "TxtHeroInfo", 14f, FontStyles.Bold,
@@ -214,17 +237,18 @@ public class StageObjectiveOverlay : MonoBehaviour
         sbRT.anchorMax = new Vector2(0.5f, 0.5f);
         sbRT.pivot     = new Vector2(0.5f, 0.5f);
         sbRT.anchoredPosition = new Vector2(0f, 65f);
-        sbRT.sizeDelta = new Vector2(680f, 68f);
+        sbRT.sizeDelta = new Vector2(680f, 72f);
 
         Image sbImg = storyBox.AddComponent<Image>();
         sbImg.color = new Color(0.12f, 0.08f, 0.20f, 0.85f);
         if (btnFantasyNormal != null) { sbImg.sprite = btnFantasyNormal; sbImg.type = Image.Type.Sliced; }
 
         TMP_Text txtStory = CreateTMP(storyBox.transform, "TxtStory", 13.5f, FontStyles.Normal,
-            new Color(0.90f, 0.86f, 0.80f, 1f), TextAlignmentOptions.Center);
+            new Color(0.92f, 0.86f, 0.80f, 1f), TextAlignmentOptions.Center);
         txtStory.rectTransform.anchorMin = Vector2.zero; txtStory.rectTransform.anchorMax = Vector2.one;
         txtStory.rectTransform.offsetMin = new Vector2(16f, 8f); txtStory.rectTransform.offsetMax = new Vector2(-16f, -8f);
-        txtStory.text = "\"Kekuatan kegelapan telah menguasai sisa-sisa reruntuhan kuil kuno. Jelajahi lembah berbatu, musnahkan pasukan monster bayangan, dan capai Gerbang Altar Kuno!\"";
+        txtStory.richText = true;
+        txtStory.text = narrativeText;
 
         // Objectives List Box
         GameObject objListBox = new GameObject("ObjectivesListBox");
@@ -236,12 +260,7 @@ public class StageObjectiveOverlay : MonoBehaviour
         olbRT.anchoredPosition = new Vector2(0f, -45f);
         olbRT.sizeDelta = new Vector2(680f, 120f);
 
-        string[] objectives = new string[]
-        {
-            "🗡  <b>OBJEKTIF UTAMA:</b> Jelajahi Lembah dan temukan Gerbang Altar Kuno",
-            "💀  <b>OBJEKTIF TEMPUR:</b> Taklukkan semua monster Skeleton & Penjaga Reruntuhan",
-            "🛡  <b>OBJEKTIF BERTAHAN:</b> Pertahankan HP karaktermu agar tidak gugur dalam pertempuran"
-        };
+        string[] objectives = objectivesList;
 
         for (int i = 0; i < objectives.Length; i++)
         {
@@ -352,7 +371,10 @@ public class StageObjectiveOverlay : MonoBehaviour
         txtTrackerObjective.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
         txtTrackerObjective.rectTransform.offsetMin = new Vector2(18f, 10f);
         txtTrackerObjective.rectTransform.offsetMax = new Vector2(-18f, -28f);
-        txtTrackerObjective.text = "• Jelajahi Lembah & Capai Altar Kuno\n• Musnahkan semua monster penjaga";
+        bool isGamePlay = (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "GamePlay");
+        txtTrackerObjective.text = isGamePlay
+            ? "• Kuasai kombo & jurus pedang\n• Taklukkan Raja Monster Slime"
+            : "• Selamatkan Penyintas dari Belenggu Iblis\n• Musnahkan Pasukan Penjaga Reruntuhan";
 
         compactTrackerRoot.SetActive(false);
     }

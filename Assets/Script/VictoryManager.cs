@@ -539,6 +539,23 @@ public class VictoryManager : MonoBehaviour
     public void KeNext()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+
+        string currentScene = SceneManager.GetActiveScene().name;
+
+        // Setelah Tutorial (GamePlay) selesai → masuk ke StoryScene (latar belakang karakter)
+        if (currentScene == "GamePlay")
+        {
+            // Simpan info bahwa story akan lanjut ke Stage 1 (CharacterSelect → Next)
+            PlayerPrefs.SetInt("TargetStageIndex", 1);
+            PlayerPrefs.SetString("TargetStageName", "LEMBAH RERUNTUHAN KUNO");
+            PlayerPrefs.SetString("TargetSceneName", "Next");
+            PlayerPrefs.Save();
+            SceneManager.LoadScene("StoryScene");
+        }
+        else
+        {
+            // Stage lain: lanjutkan ke scene berikutnya
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+        }
     }
 }
