@@ -8,11 +8,11 @@ using System.Collections.Generic;
 ///
 /// SKILL 1 : Lava Dash        — Boss melesat kencang ke arah player + jejak lava di lantai
 /// SKILL 2 : Twin Slash      — 2x ayunan tebasan cakar/pedang + letusan lava di tanah bawah player
-/// SKILL 3 : Berserker Storm — Kombo Badai Ayunan Pedang Beruntun (HP <= 50% ONLY):
-///            - Gerakan badan, ayunan pedang raksasa, dan efek lava 100% SINKRON & REALISTIS!
-///            - Bos mengayunkan pedang raksasa berputar 4x bertubi-tubi sambil lunge maju mengejar player
-///            - Efek sabetan lava pas di ujung bilah pedang (proporsional, tidak kebesaran)
-///            - HANYA aktif saat darah bos di bawah 50% (HP <= 50%)
+/// SKILL 3 : Magma Cataclysm — (HP <= 50% ONLY):
+///            FASE 1: Meraung dan menembakkan 4 bola lava pijar melengkung ke posisi player.
+///                    Bola lava meledak di tanah dan meninggalkan kolam lava cair.
+///            FASE 2: Menghantamkan pedang ke bumi memicu semburan pilar lahar vulkanik menjalar ke depan!
+///            Gerakan dan efek 100% sinkron, etis, dan masuk akal dengan sprite animasi bos.
 /// </summary>
 public class BossAI : Entity
 {
@@ -39,12 +39,11 @@ public class BossAI : Entity
     public int   skill2LavaDmg   = 25;
     public float skill2Range     = 3.0f;
 
-    // ─── Skill 3: Berserker Storm (HP <= 50% only) ────────────────────────────
-    [Header("Skill 3 - Berserker Storm Combo [HP <= 50% ONLY]")]
+    // ─── Skill 3: Magma Cataclysm (HP <= 50% only) ────────────────────────────
+    [Header("Skill 3 - Magma Cataclysm [HP <= 50% ONLY]")]
     public float skill3Cooldown   = 12.0f;
-    public int   skill3SpinDmg    = 18;     // Damage per ayunan tebasan
-    public float skill3Radius     = 2.8f;   // Jangkauan pedang pas di ujung bilah
-    public float skill3LungeSpeed = 6.0f;   // Kecepatan dorongan lunge maju saat menebas
+    public int   skill3BallDamage = 18;     // Damage per bola lava yang kena player
+    public int   skill3PillarDmg  = 35;     // Damage semburan pilar lahar dari tanah
     private bool skill3Unlocked   = false;
 
     // ─── Layer ────────────────────────────────────────────────────────────────
@@ -79,6 +78,8 @@ public class BossAI : Entity
     private Sprite fxSpinRing;
     private Sprite fxHorizontalCyclone;
     private Sprite fxHorizontalSlash;
+    private Sprite fxLavaBall;
+    private Sprite fxLavaPillar;
 
     // ─── State ────────────────────────────────────────────────────────────────
     private Transform player;
@@ -138,6 +139,8 @@ public class BossAI : Entity
         fxSpinRing          = Resources.Load<Sprite>("FX/fx_spin_ring");
         fxHorizontalCyclone = Resources.Load<Sprite>("FX/fx_horizontal_cyclone");
         fxHorizontalSlash   = Resources.Load<Sprite>("FX/fx_horizontal_slash");
+        fxLavaBall          = Resources.Load<Sprite>("FX/fx_lava_ball");
+        fxLavaPillar        = Resources.Load<Sprite>("FX/fx_lava_pillar");
     }
 
     private void SetupNameText()
@@ -210,10 +213,10 @@ public class BossAI : Entity
         bool  close = hDist <= skill2Range && vDist <= 3.5f;
 
         // Prioritas Skill:
-        // 1. Skill 3 (Berserker Storm Combo) jika unlock & siap
-        if (skill3Unlocked && skill3Timer <= 0f && hDist <= 12f)
+        // 1. Skill 3 (Magma Cataclysm: Bola Lava + Semburan Lahar) jika HP <= 50% & ready
+        if (skill3Unlocked && skill3Timer <= 0f && hDist <= 16f)
         {
-            StartCoroutine(BerserkerStormRoutine());
+            StartCoroutine(MagmaCataclysmRoutine());
             return;
         }
 
@@ -433,136 +436,238 @@ public class BossAI : Entity
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // SKILL 3 — BERSERKER STORM COMBO (HANYA SAAT HP <= 50%)
-    // - Gerakan badan, pedang raksasa, dan efek lava 100% SINKRON!
-    // - Bos mengayunkan pedang raksasa berputar 4x berturut-turut sambil maju
-    // - Efek sabetan lava pas di ujung bilah pedang (proporsional, tidak kebesaran)
+    // SKILL 3 — MAGMA CATACLYSM (HANYA SAAT HP <= 50%)
+    //
+    // FASE 1: Bos MERAUNG (`BosRoar`) dan menembakkan 4 bola lava pijar melengkung
+    //         ke posisi player. Bola meledak di tanah & meninggalkan kolam lava.
+    // FASE 2: Bos MENGHANTAMKAN PEDANG ke bumi (`BosCleave`), memicu semburan
+    //         pilar-pilar lahar vulkanik menjalar ke depan ke arah player!
     // ═════════════════════════════════════════════════════════════════════════
-    private IEnumerator BerserkerStormRoutine()
+    private IEnumerator MagmaCataclysmRoutine()
     {
         isAttacking = true;
         skill3Timer = skill3Cooldown;
         rb.velocity = Vector2.zero;
 
-        // 1. Ancang-ancang: Roar menggelegar + aura merah menyala
+        // Hadapkan ke arah player sebelum mulai
+        FlipToPlayer();
+        float faceDir = transform.localScale.x < 0 ? 1f : -1f;
+
+        // ─────────────────────────────────────────────────────────────────────
+        // FASE 1: NEMBAKIN BOLA-BOLA LAVA
+        // ─────────────────────────────────────────────────────────────────────
+        // 1. Bos Meraung mengumpulkan energi magma di dalam dada/mulutnya
+        if (anim != null) anim.Play("BosRoar", 0, 0f);
+
         if (roarSound != null && audioSource != null)
-            audioSource.PlayOneShot(roarSound, 1.2f);
+            audioSource.PlayOneShot(roarSound, 1.25f);
 
-        if (anim != null) anim.SetTrigger("Roar");
+        // Efek aura merah membara berdenyut di tubuh bos saat meraung
+        yield return StartCoroutine(ColorPulse(new Color(2.0f, 0.35f, 0.05f, 1f), 0.35f));
 
-        yield return StartCoroutine(ColorPulse(new Color(1.8f, 0.25f, 0.0f, 1f), 0.35f));
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(0.25f, 0.20f);
 
-        if (player == null || isDead) { isAttacking = false; yield break; }
-
-        // Percepat animasi Cleave (1.7x) agar ayunan cepat, bertenaga, dan agresif
-        if (anim != null) anim.speed = 1.7f;
-
-        int comboCount = 4;
-        float swingDuration = 1.25f / 1.7f; // ~0.73 detik per ayunan penuh
-        float baseScale = Mathf.Clamp(bossScale, 1.5f, 2.0f);
-
-        for (int i = 0; i < comboCount; i++)
+        // 2. Tembakkan 4 Bola Lava Pijar berturut-turut meluncur ke posisi player
+        int orbCount = 4;
+        for (int i = 0; i < orbCount; i++)
         {
             if (isDead) break;
 
-            // Arah menuju player
-            float dirToPlayer = player != null ? Mathf.Sign(player.position.x - transform.position.x) : 1f;
+            // Suara letupan tembakan bola api
+            if (attackSound != null && audioSource != null)
+                audioSource.PlayOneShot(attackSound, 0.9f);
 
-            // Bergantian ayunan dua arah untuk efek sabetan badai berputar
-            bool swingRight = (i % 2 == 0) ? (dirToPlayer > 0) : (dirToPlayer < 0);
-            float faceSign = swingRight ? -1f : 1f; // -s adalah hadap kanan di BATH
-            transform.localScale = new Vector3(faceSign * baseScale, baseScale, 1f);
+            // Posisi mulut / dada bos saat meraung
+            Vector3 mouthPos = transform.position + new Vector3(faceDir * 0.9f, 0.85f, 0f);
 
-            // Putar animasi Cleave langsung dari frame 0
-            if (anim != null)
-                anim.Play("BosCleave", 0, 0f);
+            // Target mendarat di sekitar posisi player saat ini (dengan sedikit variasi sebaran)
+            Vector3 targetLandingPos = player != null
+                ? new Vector3(player.position.x + Random.Range(-1.6f, 1.6f), player.position.y - 0.45f, 0f)
+                : transform.position + new Vector3(faceDir * (4f + i * 2f), -0.45f, 0f);
 
-            // Gerak maju bertenaga (lunge) ke arah player saat mengayun
-            rb.velocity = new Vector2(dirToPlayer * skill3LungeSpeed, rb.velocity.y);
+            // Luncurkan proyektil bola lava
+            StartCoroutine(LaunchLavaBall(mouthPos, targetLandingPos, 0.65f, skill3BallDamage));
 
-            // Afterimage api di lintasan langkah
-            SpawnAfterimage(new Color(1f, 0.3f, 0.0f, 0.6f));
+            // Efek percikan api kecil di mulut bos saat menembak
+            SpawnFX(mouthPos, fxLavaSplash, new Vector3(0.5f, 0.6f, 1f),
+                    faceDir * 35f, 0.25f, new Color(1f, 0.5f, 0.1f, 0.9f));
 
-            // Tunggu hingga frame tebasan mencapai puncaknya (0.35 detik)
-            yield return new WaitForSeconds(0.35f);
+            yield return new WaitForSeconds(0.22f);
+        }
 
+        // Jeda sepersekian detik setelah tembakan bola lava selesai
+        yield return new WaitForSeconds(0.35f);
+
+        if (isDead) { isAttacking = false; yield break; }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // FASE 2: MENGHANTAMKAN PEDANG & MENYEMBURKAN LAHAR DARI TANAH
+        // ─────────────────────────────────────────────────────────────────────
+        // 1. Bos mengangkat pedang raksasa ke atas dan menghantamkannya ke tanah!
+        if (anim != null) anim.Play("BosCleave", 0, 0f);
+
+        // Tunggu hingga frame pedang menghantam bumi (sekitar 0.60 detik)
+        yield return new WaitForSeconds(0.58f);
+
+        if (isDead) { isAttacking = false; yield break; }
+
+        // 2. DETIK HANTAMAN PEDANG: Tanah merekah meledak di depan kaki bos!
+        if (attackSound != null && audioSource != null)
+            audioSource.PlayOneShot(attackSound, 1.4f);
+
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(0.50f, 0.45f);
+
+        // Titik awal retakan di depan pedang menancap
+        Vector3 swordImpactPos = transform.position + new Vector3(faceDir * 1.5f, -0.55f, 0f);
+
+        // Flash ledakan di titik hantam
+        SpawnFX(swordImpactPos, fxSlashCross, Vector3.one * 1.8f, 0f, 0.30f, Color.white);
+        SpawnFX(swordImpactPos, fxLavaPool, new Vector3(2.5f, 1.0f, 1f), 0f, 2.0f,
+                new Color(1f, 0.3f, 0.0f, 0.95f), true, 1.1f);
+
+        // 3. Semburan Pilar Lahar Vulkanik menjalar ke depan secara berurutan!
+        int pillarCount = 5;
+        float pillarSpacing = 1.6f;
+
+        for (int p = 0; p < pillarCount; p++)
+        {
             if (isDead) break;
 
-            // KETIKA PEDANG MENEBAS: Efek tebasan lava muncul PAS di ujung pedang!
-            float swingDir = swingRight ? 1f : -1f;
-            Vector3 slashPos = transform.position + new Vector3(swingDir * 1.4f, 0.25f, 0f);
+            Vector3 pillarPos = swordImpactPos + new Vector3(faceDir * (p * pillarSpacing), 0f, 0f);
 
-            // Sabetan lava horizontal proporsional (panjang ~2.8 unit, tinggi ~0.9 unit)
-            SpawnFX(slashPos,
-                    fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
-                    new Vector3(swingDir * 0.48f, 0.38f, 1f),
-                    Random.Range(-5f, 5f),
-                    0.22f,
-                    new Color(1f, 0.75f, 0.2f, 1f));
+            // Pilar lahar menyembur vertikal ke atas dari rekahan bumi!
+            SpawnFX(pillarPos + Vector3.up * 0.9f,
+                    fxLavaPillar != null ? fxLavaPillar : fxLavaSplash,
+                    new Vector3(1.1f, 1.5f, 1f),
+                    0f,
+                    0.55f,
+                    new Color(1f, 0.45f, 0.1f, 1f),
+                    true, 1.15f);
 
-            SpawnFX(slashPos * 0.9f, fxSlashCross, Vector3.one * 0.9f, 0f, 0.20f, Color.white);
+            // Kolam lava tersisa di tanah tempat pilar menyembur
+            SpawnFX(pillarPos, fxLavaPool,
+                    new Vector3(1.5f, 0.7f, 1f), 0f, 1.8f,
+                    new Color(1f, 0.25f, 0.0f, 0.85f), true, 1.05f);
 
-            if (attackSound != null && audioSource != null)
-                audioSource.PlayOneShot(attackSound, 1.15f);
-
+            // Getaran kecil saat tiap semburan pilar meletus
             if (CameraFollow.instance != null)
-                CameraFollow.instance.TriggerScreenShake(0.18f, 0.16f);
+                CameraFollow.instance.TriggerScreenShake(0.18f, 0.15f);
 
-            // Kolam lava kecil di tanah di bawah jalur sabetan
-            Vector3 groundLavaPos = new Vector3(slashPos.x, transform.position.y - 0.55f, 0f);
-            SpawnFX(groundLavaPos, fxLavaPool, new Vector3(1.1f, 0.6f, 1f), 0f, 0.8f,
-                    new Color(1f, 0.3f, 0.0f, 0.80f), true, 1.05f);
-
-            // Damage tebasan
-            Collider2D[] hits = Physics2D.OverlapCircleAll(slashPos, skill3Radius, playerLayer);
-            foreach (var h in hits)
+            // Damage semburan lahar
+            Collider2D[] pillarHits = Physics2D.OverlapCircleAll(pillarPos + Vector3.up * 0.8f, 1.5f, playerLayer);
+            foreach (var h in pillarHits)
             {
                 Entity ent = h.GetComponent<Entity>();
                 if (ent != null)
                 {
-                    ent.TakeDamage(skill3SpinDmg, false);
+                    ent.TakeDamage(skill3PillarDmg, true); // Knockback terpental ke atas!
                 }
             }
 
-            yield return new WaitForSeconds(Mathf.Max(0.05f, swingDuration - 0.35f));
+            yield return new WaitForSeconds(0.10f); // Jeda beruntun menjalar ke depan
         }
 
-        // Kembalikan kecepatan animasi ke normal
-        if (anim != null) anim.speed = 1.0f;
-        rb.velocity = Vector2.zero;
+        yield return new WaitForSeconds(0.5f);
+        isAttacking = false;
+    }
 
-        // FINISHER SLAM: Tebasan ledakan penutup
-        if (!isDead)
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROYEKTIL BOLA LAVA MELENGKUNG (PARABOLA ARC)
+    // ─────────────────────────────────────────────────────────────────────────
+    private IEnumerator LaunchLavaBall(Vector3 start, Vector3 target, float duration, int directDmg)
+    {
+        GameObject orbGO = new GameObject("LavaOrb_Projectile");
+        orbGO.transform.position = start;
+        orbGO.transform.localScale = new Vector3(0.75f, 0.75f, 1f);
+
+        SpriteRenderer srOrb = orbGO.AddComponent<SpriteRenderer>();
+        srOrb.sprite = fxLavaBall != null ? fxLavaBall : fxSlashCross;
+        srOrb.color  = new Color(1f, 0.85f, 0.3f, 1f);
+        srOrb.sortingOrder = 52;
+
+        Material mat = new Material(Shader.Find("Sprites/Default"));
+        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive Glow
+        srOrb.material = mat;
+
+        float elapsed = 0f;
+        float arcHeight = 2.6f; // Tinggi lengkungan parabola saat melayang di udara
+        float rotSpeed = 360f;
+
+        bool hasHitPlayer = false;
+
+        while (elapsed < duration)
         {
-            if (attackSound != null && audioSource != null)
-                audioSource.PlayOneShot(attackSound, 1.4f);
+            if (orbGO == null) yield break;
 
-            if (CameraFollow.instance != null)
-                CameraFollow.instance.TriggerScreenShake(0.45f, 0.35f);
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
 
-            Vector3 groundCenter = new Vector3(transform.position.x, transform.position.y - 0.55f, 0f);
-            SpawnFX(groundCenter, fxLavaPool, new Vector3(2.5f, 1.0f, 1f), 0f, 1.8f,
-                    new Color(1f, 0.25f, 0.0f, 0.90f), true, 1.1f);
+            // Interpolasi posisi X dan Y dengan kurva parabola
+            float currentX = Mathf.Lerp(start.x, target.x, t);
+            float baseY    = Mathf.Lerp(start.y, target.y, t);
+            float arcY     = Mathf.Sin(t * Mathf.PI) * arcHeight;
 
-            for (int k = -1; k <= 1; k += 2)
+            Vector3 currentPos = new Vector3(currentX, baseY + arcY, 0f);
+            orbGO.transform.position = currentPos;
+            orbGO.transform.Rotate(0f, 0f, rotSpeed * Time.deltaTime);
+
+            // Afterimage ekor api di belakang bola lava saat melesat
+            if (Random.value < 0.45f)
             {
-                SpawnFX(transform.position + new Vector3(k * 1.5f, 0.2f, 0f),
-                        fxHorizontalSlash != null ? fxHorizontalSlash : fxSlashArc,
-                        new Vector3(k * 0.55f, 0.42f, 1f), 0f, 0.30f,
-                        new Color(1f, 0.85f, 0.25f, 1f));
+                SpawnFX(currentPos, fxLavaSplash,
+                        new Vector3(0.45f, 0.45f, 1f),
+                        Random.Range(0f, 360f), 0.20f,
+                        new Color(1f, 0.4f, 0.05f, 0.75f));
             }
 
-            Collider2D[] finalHits = Physics2D.OverlapCircleAll(transform.position, skill3Radius + 0.8f, playerLayer);
-            foreach (var h in finalHits)
+            // Deteksi tabrakan dengan player di udara
+            if (!hasHitPlayer)
+            {
+                Collider2D airHit = Physics2D.OverlapCircle(currentPos, 0.7f, playerLayer);
+                if (airHit != null)
+                {
+                    Entity ent = airHit.GetComponent<Entity>();
+                    if (ent != null)
+                    {
+                        hasHitPlayer = true;
+                        ent.TakeDamage(directDmg, false);
+                        break; // Langsung meledak
+                    }
+                }
+            }
+
+            yield return null;
+        }
+
+        Vector3 impactPos = orbGO != null ? orbGO.transform.position : target;
+        if (orbGO != null) Destroy(orbGO);
+
+        // ── LEDAKAN SAAT MENDARAT DI TANAH ──
+        if (CameraFollow.instance != null)
+            CameraFollow.instance.TriggerScreenShake(0.18f, 0.16f);
+
+        // Percikan lava meledak
+        SpawnFX(impactPos, fxLavaSplash, new Vector3(1.1f, 1.3f, 1f),
+                0f, 0.45f, new Color(1f, 0.5f, 0.1f, 1f), true, 1.15f);
+
+        // Kolam lava cair tersisa di tanah selama 2 detik
+        SpawnFX(new Vector3(impactPos.x, impactPos.y - 0.2f, 0f), fxLavaPool,
+                new Vector3(1.4f, 0.7f, 1f), 0f, 2.0f,
+                new Color(1f, 0.28f, 0.0f, 0.85f), true, 1.05f);
+
+        // Damage ledakan di tanah
+        if (!hasHitPlayer)
+        {
+            Collider2D[] groundHits = Physics2D.OverlapCircleAll(impactPos, 1.3f, playerLayer);
+            foreach (var h in groundHits)
             {
                 Entity ent = h.GetComponent<Entity>();
-                if (ent != null) ent.TakeDamage(skill3SpinDmg * 2, true);
+                if (ent != null) ent.TakeDamage(directDmg, false);
             }
         }
-
-        FlipToPlayer();
-        yield return new WaitForSeconds(0.35f);
-        isAttacking = false;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -851,7 +956,5 @@ public class BossAI : Entity
         Gizmos.color = Color.red;
         if (entityAttackPoint != null)
             Gizmos.DrawWireSphere(entityAttackPoint.position, skill2Range);
-        Gizmos.color = new Color(1f, 0.4f, 0f, 0.3f);
-        Gizmos.DrawWireSphere(transform.position, skill3Radius);
     }
 }
