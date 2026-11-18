@@ -78,6 +78,15 @@ public class GameSceneManager : MonoBehaviour
     private int   walkFrameIndex = 0;
     private bool  facingRight   = true;
 
+    // Animasi & Gerakan Tambahan (Konsisten dengan Karakter Aether)
+    private bool  isDashing = false;
+    private float dashCooldown = 0.55f;
+    private float lastDashTime = -999f;
+    private int   comboStep = 0;
+    private float lastComboTime = -999f;
+    private GameObject swordAuraObj;
+    private SpriteRenderer swordAuraSR;
+
     // =========================================================================
     // UI REFS
     // =========================================================================
@@ -158,18 +167,18 @@ public class GameSceneManager : MonoBehaviour
 
     Sprite SafeLoadSprite(string resourceSubPath)
     {
-        // Cara 1: Resources.Load<Sprite>
-        Sprite s = Resources.Load<Sprite>(resourceSubPath);
-        if (s != null) return s;
+        bool needsChroma = !resourceSubPath.Contains("map_courtyard") && !resourceSubPath.Contains("hud_") && !resourceSubPath.Contains("ui_circle");
 
-        // Cara 2: Resources.Load<Texture2D>
+        // Cara 1: Resources.Load<Texture2D> - biar bisa apply chroma key
         Texture2D t = Resources.Load<Texture2D>(resourceSubPath);
         if (t != null)
         {
-            return Sprite.Create(t, new Rect(0, 0, t.width, t.height), new Vector2(0.5f, 0.5f), 100f);
+            Texture2D editable = MakeReadableTexture(t);
+            if (needsChroma) RemoveChromaKey(editable);
+            return Sprite.Create(editable, new Rect(0, 0, editable.width, editable.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
-        // Cara 3: Baca file mentah dari disk (Application.dataPath)
+        // Cara 2: Baca file mentah dari disk
         string basePath = Path.Combine(Application.dataPath, "Resources", resourceSubPath);
         string[] candidates = new string[] { basePath + ".png", basePath + ".jpg", basePath + ".jpeg" };
 
@@ -182,6 +191,8 @@ public class GameSceneManager : MonoBehaviour
                 diskTex.filterMode = FilterMode.Bilinear;
                 if (diskTex.LoadImage(bytes))
                 {
+                    if (needsChroma) RemoveChromaKey(diskTex);
+                    diskTex.Apply();
                     return Sprite.Create(diskTex, new Rect(0, 0, diskTex.width, diskTex.height), new Vector2(0.5f, 0.5f), 100f);
                 }
             }
@@ -189,6 +200,45 @@ public class GameSceneManager : MonoBehaviour
 
         Debug.LogWarning("[GameSceneManager] Sprite tidak ditemukan di: " + resourceSubPath);
         return null;
+    }
+
+    // Buat texture yang bisa dibaca/ditulis (readable)
+    Texture2D MakeReadableTexture(Texture2D source)
+    {
+        RenderTexture rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+        Graphics.Blit(source, rt);
+        RenderTexture prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        Texture2D readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+        readable.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+        readable.Apply();
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+        return readable;
+    }
+
+    // Hapus background chroma key (magenta #FF00FF ATAU hijau #00FF00)
+    void RemoveChromaKey(Texture2D tex)
+    {
+        Color32[] pixels = tex.GetPixels32();
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            Color32 c = pixels[i];
+            int r = c.r, g = c.g, b = c.b;
+
+            // Hapus Magenta (#FF00FF) - merah tinggi, biru tinggi, hijau rendah
+            bool isMagenta = (r > 180 && b > 180 && g < 80);
+
+            // Hapus Hijau (#00FF00) - hijau sangat dominan
+            bool isGreen = (g > 140 && g > r * 1.35f && g > b * 1.35f);
+
+            if (isMagenta || isGreen)
+            {
+                pixels[i] = new Color32(0, 0, 0, 0); // transparent
+            }
+        }
+        tex.SetPixels32(pixels);
+        // Apply() dipanggil oleh pemanggil
     }
 
     // =========================================================================
@@ -313,14 +363,14 @@ public class GameSceneManager : MonoBehaviour
         aud.playOnAwake = false;
 
         // Efek aura pedang ungu halus
-        GameObject swordAura = new GameObject("SwordGlow");
-        swordAura.transform.SetParent(playerObj.transform, false);
-        swordAura.transform.localPosition = new Vector2(0.35f, -0.2f);
-        SpriteRenderer auraSR = swordAura.AddComponent<SpriteRenderer>();
-        auraSR.sprite = MakeGlowOrbSprite(32);
-        auraSR.color = new Color(0.65f, 0.20f, 1.0f, 0.35f);
-        auraSR.sortingOrder = 9;
-        swordAura.transform.localScale = Vector3.one * 0.8f;
+        swordAuraObj = new GameObject("SwordGlow");
+        swordAuraObj.transform.SetParent(playerObj.transform, false);
+        swordAuraObj.transform.localPosition = new Vector2(0.35f, -0.2f);
+        swordAuraSR = swordAuraObj.AddComponent<SpriteRenderer>();
+        swordAuraSR.sprite = MakeGlowOrbSprite(32);
+        swordAuraSR.color = new Color(0.65f, 0.20f, 1.0f, 0.35f);
+        swordAuraSR.sortingOrder = 9;
+        swordAuraObj.transform.localScale = Vector3.one * 0.8f;
     }
 
     // =========================================================================
@@ -342,20 +392,50 @@ public class GameSceneManager : MonoBehaviour
 
         HandleMovementInput();
         HandleCombatInput();
+        UpdateIdleBreathing();
 
         // Bersihkan musuh mati
         activeEnemies.RemoveAll(e => e == null);
     }
 
+    void UpdateIdleBreathing()
+    {
+        if (isAttacking || isDashing || isDead || playerObj == null) return;
+
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+
+        if (Mathf.Abs(h) < 0.05f && Mathf.Abs(v) < 0.05f)
+        {
+            // Efek nafas halus naik-turun pada sumbu Y
+            float breath = 1.0f + Mathf.Sin(Time.time * 3.5f) * 0.025f;
+            playerObj.transform.localScale = new Vector3(facingRight ? 0.55f : -0.55f, 0.55f * breath, 1f);
+
+            // Denyut aura ungu pada pedang Aether
+            if (swordAuraSR != null)
+            {
+                float pulse = 0.25f + Mathf.PingPong(Time.time * 1.5f, 0.25f);
+                swordAuraSR.color = new Color(0.70f, 0.20f, 1.0f, pulse);
+            }
+        }
+    }
+
     void HandleMovementInput()
     {
-        if (playerObj == null || playerRB == null || isAttacking) return;
+        if (playerObj == null || playerRB == null || isAttacking || isDashing) return;
 
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
 
         Vector2 inputDir = new Vector2(h, v).normalized;
         playerRB.velocity = inputDir * moveSpeed;
+
+        // Dash Cepat dengan LeftShift
+        if (Input.GetKeyDown(KeyCode.LeftShift) && Time.time >= lastDashTime + dashCooldown)
+        {
+            StartCoroutine(DashRoutine(inputDir == Vector2.zero ? (facingRight ? Vector2.right : Vector2.left) : inputDir));
+            return;
+        }
 
         // Flip arah pandang horizontal
         if (h > 0.05f && !facingRight)
@@ -369,22 +449,56 @@ public class GameSceneManager : MonoBehaviour
             playerObj.transform.localScale = new Vector3(-0.55f, 0.55f, 1f);
         }
 
-        // Animasi Gerak
+        // Animasi Gerak Berjalan / Berlari
         if (inputDir.sqrMagnitude > 0.01f)
         {
             walkAnimTimer += Time.deltaTime;
-            if (walkAnimTimer >= 0.14f)
+            // Kemiringan badan dinamis saat lari
+            playerObj.transform.localEulerAngles = new Vector3(0, 0, -inputDir.x * 5.0f);
+
+            if (walkAnimTimer >= 0.11f)
             {
                 walkAnimTimer = 0f;
-                walkFrameIndex = (walkFrameIndex + 1) % 2;
-                playerSR.sprite = (walkFrameIndex == 0) ? sprAetherWalk1 : sprAetherWalk2;
+                walkFrameIndex = (walkFrameIndex + 1) % 4;
+
+                switch (walkFrameIndex)
+                {
+                    case 0: playerSR.sprite = (sprAetherWalk1 != null) ? sprAetherWalk1 : sprAetherIdle; break;
+                    case 1: playerSR.sprite = (sprAetherRun != null) ? sprAetherRun : sprAetherWalk1; break;
+                    case 2: playerSR.sprite = (sprAetherWalk2 != null) ? sprAetherWalk2 : sprAetherWalk1; break;
+                    case 3: playerSR.sprite = sprAetherIdle; break;
+                }
+
+                SpawnFootstepSpark(playerObj.transform.position + new Vector3(0, -0.4f, 0));
             }
         }
         else
         {
             walkAnimTimer = 0f;
+            playerObj.transform.localEulerAngles = Vector3.zero;
             playerSR.sprite = sprAetherIdle;
         }
+    }
+
+    IEnumerator DashRoutine(Vector2 dir)
+    {
+        isDashing = true;
+        lastDashTime = Time.time;
+        invincibilityTimer = 0.35f;
+
+        if (sprAetherRun != null) playerSR.sprite = sprAetherRun;
+        playerRB.velocity = dir * 11.0f;
+
+        // Jejak bayangan ungu (Afterimage ghost trail)
+        for (int i = 0; i < 4; i++)
+        {
+            SpawnGhostAfterimage();
+            yield return new WaitForSeconds(0.045f);
+        }
+
+        playerRB.velocity = Vector2.zero;
+        isDashing = false;
+        playerSR.sprite = sprAetherIdle;
     }
 
     void HandleCombatInput()
@@ -417,11 +531,11 @@ public class GameSceneManager : MonoBehaviour
     }
 
     // =========================================================================
-    // SERANGAN & SKILL AETHER
+    // SERANGAN & SKILL AETHER (KOMBO 3-HIT, AFTERIMAGE, & EFEK MAGIS)
     // =========================================================================
     public void PerformBasicAttack()
     {
-        if (isAttacking || isDead) return;
+        if (isAttacking || isDead || isDashing) return;
         StartCoroutine(BasicAttackRoutine());
     }
 
@@ -430,17 +544,43 @@ public class GameSceneManager : MonoBehaviour
         isAttacking = true;
         playerRB.velocity = Vector2.zero;
 
-        // Tampilkan pose tebasan Aether dengan sabit ungu
-        if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
+        // Reset kombo jika jeda terlalu lama
+        if (Time.time - lastComboTime > 0.85f) comboStep = 0;
+        comboStep = (comboStep % 3) + 1;
+        lastComboTime = Time.time;
 
-        // Spawn gelombang sabit ungu meluncur
         Vector2 slashDir = facingRight ? Vector2.right : Vector2.left;
-        SpawnSlashWave(playerObj.transform.position + new Vector3(slashDir.x * 0.7f, 0.1f, 0f), slashDir, 25);
 
-        // Beri damage ke musuh di depan
-        HitEnemiesInCone(playerObj.transform.position, slashDir, 2.2f, 25);
-
-        yield return new WaitForSeconds(0.32f);
+        if (comboStep == 1)
+        {
+            // Kombo 1: Tebasan Cepat Mendatar
+            if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
+            playerObj.transform.position += (Vector3)(slashDir * 0.15f);
+            SpawnSlashWave(playerObj.transform.position + new Vector3(slashDir.x * 0.7f, 0.1f, 0f), slashDir, 25, 1.2f);
+            HitEnemiesInCone(playerObj.transform.position, slashDir, 2.2f, 25);
+            yield return new WaitForSeconds(0.22f);
+        }
+        else if (comboStep == 2)
+        {
+            // Kombo 2: Tebasan Silang Beruntun
+            if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
+            playerObj.transform.position += (Vector3)(slashDir * 0.20f);
+            SpawnSlashWave(playerObj.transform.position + new Vector3(slashDir.x * 0.8f, 0.25f, 0f), slashDir, 35, 1.4f);
+            HitEnemiesInCone(playerObj.transform.position, slashDir, 2.4f, 35);
+            TriggerCameraShake(0.12f, 0.06f);
+            yield return new WaitForSeconds(0.24f);
+        }
+        else
+        {
+            // Kombo 3 (Finisher): Tebasan Sabit Raksasa Membelah
+            if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
+            playerObj.transform.position += (Vector3)(slashDir * 0.30f);
+            SpawnSlashWave(playerObj.transform.position + new Vector3(slashDir.x * 1.0f, 0.15f, 0f), slashDir, 55, 1.8f);
+            HitEnemiesInCone(playerObj.transform.position, slashDir, 3.0f, 55);
+            TriggerCameraShake(0.18f, 0.12f);
+            comboStep = 0;
+            yield return new WaitForSeconds(0.32f);
+        }
 
         isAttacking = false;
         playerSR.sprite = sprAetherIdle;
@@ -448,7 +588,7 @@ public class GameSceneManager : MonoBehaviour
 
     public void PerformSkill1()
     {
-        if (isAttacking || isDead || mpCur < 12) return;
+        if (isAttacking || isDead || isDashing || mpCur < 12) return;
         mpCur -= 12;
         UpdateHUDValues();
         StartCoroutine(Skill1Routine());
@@ -457,18 +597,22 @@ public class GameSceneManager : MonoBehaviour
     IEnumerator Skill1Routine()
     {
         isAttacking = true;
-        playerSR.sprite = sprAetherAttack;
+        if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
 
-        // Dash cepat ke depan dengan jejak bayangan ungu
         Vector2 dashDir = facingRight ? Vector2.right : Vector2.left;
-        playerRB.velocity = dashDir * 12f;
+        playerRB.velocity = dashDir * 13.5f;
 
-        // Efek tebasan ganda
-        SpawnSlashWave(playerObj.transform.position + new Vector3(dashDir.x * 0.9f, 0.2f, 0f), dashDir, 40);
-        HitEnemiesInCone(playerObj.transform.position, dashDir, 3.2f, 40);
+        // Jejak bayangan ungu selama dash tebasan
+        for (int i = 0; i < 5; i++)
+        {
+            SpawnGhostAfterimage();
+            yield return new WaitForSeconds(0.035f);
+        }
 
-        yield return new WaitForSeconds(0.20f);
         playerRB.velocity = Vector2.zero;
+        SpawnSlashWave(playerObj.transform.position + new Vector3(dashDir.x * 1.0f, 0.2f, 0f), dashDir, 45, 1.8f);
+        HitEnemiesInCone(playerObj.transform.position, dashDir, 3.5f, 45);
+        TriggerCameraShake(0.15f, 0.10f);
 
         yield return new WaitForSeconds(0.18f);
         isAttacking = false;
@@ -477,7 +621,7 @@ public class GameSceneManager : MonoBehaviour
 
     public void PerformSkill2()
     {
-        if (isAttacking || isDead || mpCur < 20) return;
+        if (isAttacking || isDead || isDashing || mpCur < 20) return;
         mpCur -= 20;
         UpdateHUDValues();
         StartCoroutine(Skill2Routine());
@@ -487,19 +631,26 @@ public class GameSceneManager : MonoBehaviour
     {
         isAttacking = true;
         playerRB.velocity = Vector2.zero;
-        playerSR.sprite = sprAetherSkill;
+        if (sprAetherSkill != null) playerSR.sprite = sprAetherSkill;
 
-        // Ledakan radial 360 derajat
-        SpawnRadialSkillBurst(playerObj.transform.position, 3.5f, 50);
+        TriggerCameraShake(0.35f, 0.10f);
 
-        yield return new WaitForSeconds(0.45f);
+        // Putaran bilah energi sabit ungu melingkar 3 gelombang
+        for (int step = 0; step < 3; step++)
+        {
+            SpawnRadialSkillBurst(playerObj.transform.position, 4.0f, 25);
+            SpawnGhostAfterimage();
+            yield return new WaitForSeconds(0.12f);
+        }
+
+        yield return new WaitForSeconds(0.20f);
         isAttacking = false;
         playerSR.sprite = sprAetherIdle;
     }
 
     public void PerformSkill3()
     {
-        if (isAttacking || isDead || mpCur < 35) return;
+        if (isAttacking || isDead || isDashing || mpCur < 35) return;
         mpCur -= 35;
         UpdateHUDValues();
         StartCoroutine(Skill3Routine());
@@ -509,25 +660,112 @@ public class GameSceneManager : MonoBehaviour
     {
         isAttacking = true;
         playerRB.velocity = Vector2.zero;
-        playerSR.sprite = sprAetherSkill;
 
-        // Ultimate: Hantaman Pilar Cahaya Ungu ke Semua Musuh di Courtyard
+        // Gerakan menghujamkan pedang ke lantai batu
+        if (sprAetherSkill != null) playerSR.sprite = sprAetherSkill;
+        TriggerCameraShake(0.50f, 0.20f);
+
+        // Lingkaran sihir ungu runik di bawah kaki
+        SpawnMagicCircleRune(playerObj.transform.position);
+
+        // Ledakan energi radial luas
+        SpawnRadialSkillBurst(playerObj.transform.position, 6.5f, 75);
+
+        // Pilar cahaya ungu vertikal menyembur dari setiap musuh
         foreach (var enemy in activeEnemies)
         {
             if (enemy != null)
             {
                 SpawnPillarOfLight(enemy.transform.position);
-                enemy.GetComponent<DemonCourtyardAI>()?.TakeDamage(80);
+                enemy.GetComponent<DemonCourtyardAI>()?.TakeDamage(100);
             }
         }
 
-        SpawnRadialSkillBurst(playerObj.transform.position, 5.0f, 60);
-
-        yield return new WaitForSeconds(0.60f);
+        yield return new WaitForSeconds(0.50f);
         isAttacking = false;
         playerSR.sprite = sprAetherIdle;
     }
 
+    // =========================================================================
+    // HELPER EFFECTS: GhostAfterimage, CameraShake, MagicRune, FootstepSpark
+    // =========================================================================
+    void SpawnGhostAfterimage()
+    {
+        if (playerObj == null || playerSR == null) return;
+        GameObject ghost = new GameObject("GhostAfterimage");
+        ghost.transform.position = playerObj.transform.position;
+        ghost.transform.localScale = playerObj.transform.localScale;
+        ghost.transform.localEulerAngles = playerObj.transform.localEulerAngles;
+        SpriteRenderer gsr = ghost.AddComponent<SpriteRenderer>();
+        gsr.sprite = playerSR.sprite;
+        gsr.sortingOrder = 8;
+        gsr.color = new Color(0.65f, 0.20f, 1.0f, 0.65f);
+        StartCoroutine(FadeAndDestroy(ghost, 0.22f));
+    }
+
+    void TriggerCameraShake(float duration, float magnitude)
+    {
+        StartCoroutine(ShakeCameraRoutine(duration, magnitude));
+    }
+
+    IEnumerator ShakeCameraRoutine(float duration, float magnitude)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) yield break;
+        Vector3 originalPos = cam.transform.position;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            float x = Random.Range(-magnitude, magnitude);
+            float y = Random.Range(-magnitude, magnitude);
+            cam.transform.position = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        cam.transform.position = originalPos;
+    }
+
+    void SpawnMagicCircleRune(Vector3 pos)
+    {
+        GameObject rune = new GameObject("MagicCircleRune");
+        rune.transform.position = pos;
+        rune.transform.localScale = Vector3.one * 2.5f;
+        SpriteRenderer sr = rune.AddComponent<SpriteRenderer>();
+        sr.sprite = MakeGlowOrbSprite(64);
+        sr.color = new Color(0.70f, 0.15f, 1.0f, 0.60f);
+        sr.sortingOrder = 14;
+        StartCoroutine(FadeAndDestroy(rune, 0.55f));
+    }
+
+    void SpawnFootstepSpark(Vector3 pos)
+    {
+        if (Random.value > 0.4f) return;
+        GameObject spark = new GameObject("FootstepSpark");
+        spark.transform.position = pos;
+        spark.transform.localScale = Vector3.one * 0.15f;
+        SpriteRenderer sr = spark.AddComponent<SpriteRenderer>();
+        sr.sprite = MakeGlowOrbSprite(16);
+        sr.color = new Color(0.70f, 0.20f, 1.0f, 0.80f);
+        sr.sortingOrder = 7;
+        StartCoroutine(FadeAndDestroy(spark, 0.15f));
+    }
+
+    // Overload SpawnSlashWave dengan parameter scale
+    void SpawnSlashWave(Vector3 pos, Vector2 dir, int damage, float scale)
+    {
+        GameObject slash = new GameObject("PurpleSlashWave");
+        slash.transform.position = pos;
+        slash.transform.localScale = new Vector3(facingRight ? scale : -scale, scale, 1f);
+
+        SpriteRenderer sr = slash.AddComponent<SpriteRenderer>();
+        sr.sprite = MakeCrescentSlashSprite(64);
+        sr.color = new Color(0.85f, 0.35f, 1.0f, 0.95f);
+        sr.sortingOrder = 15;
+
+        StartCoroutine(AnimateSlash(slash, dir));
+    }
+
+    // Overload original (tanpa scale)
     void SpawnSlashWave(Vector3 pos, Vector2 dir, int damage)
     {
         GameObject slash = new GameObject("PurpleSlashWave");
