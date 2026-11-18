@@ -49,6 +49,9 @@ public class GameSceneManager : MonoBehaviour
     private Sprite sprBtnSkill2;
     private Sprite sprBtnSkill3;
     private Sprite sprPortrait;
+    private Sprite sprCircleSkillBg;
+    private Sprite sprCircleAtkBg;
+    private Sprite sprCirclePortBg;
 
     // =========================================================================
     // STATE PEMAIN (AETHER)
@@ -147,6 +150,10 @@ public class GameSceneManager : MonoBehaviour
         sprBtnSkill2      = SafeLoadSprite("Stage1/ui_btn_skill2");
         sprBtnSkill3      = SafeLoadSprite("Stage1/ui_btn_skill3");
         sprPortrait       = SafeLoadSprite("Stage1/ui_portrait");
+
+        sprCircleSkillBg  = SafeLoadSprite("Stage1/ui_circle_skill_bg");
+        sprCircleAtkBg    = SafeLoadSprite("Stage1/ui_circle_atk_bg");
+        sprCirclePortBg   = SafeLoadSprite("Stage1/ui_circle_portrait_bg");
     }
 
     Sprite SafeLoadSprite(string resourceSubPath)
@@ -255,9 +262,6 @@ public class GameSceneManager : MonoBehaviour
         AddObstacle("PillarArch_Right", new Vector2( 2.8f, 1.2f), new Vector2(1.2f, 1.5f));
         AddObstacle("Ruins_BottomLeft", new Vector2(-3.0f, -1.8f), new Vector2(1.5f, 1.0f));
         AddObstacle("Ruins_BottomRight",new Vector2( 3.0f, -1.8f), new Vector2(1.5f, 1.0f));
-
-        // Partikel Kabut Ungu Melayang di Courtyard
-        BuildAtmosphericMist();
     }
 
     void AddWallCollider(string name, Vector2 pos, Vector2 size)
@@ -276,38 +280,6 @@ public class GameSceneManager : MonoBehaviour
         obs.layer = 6;
         BoxCollider2D bc = obs.AddComponent<BoxCollider2D>();
         bc.size = size;
-    }
-
-    void BuildAtmosphericMist()
-    {
-        GameObject mistGO = new GameObject("CourtyardMistParticles");
-        mistGO.transform.position = new Vector3(0, 0, -1f);
-
-        ParticleSystem ps = mistGO.AddComponent<ParticleSystem>();
-        var main = ps.main;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(6f, 11f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.04f, 0.15f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.8f, 2.2f);
-        main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.40f, 0.10f, 0.75f, 0.08f),
-            new Color(0.60f, 0.20f, 0.95f, 0.16f)
-        );
-        main.maxParticles = 50;
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.loop = true;
-
-        var em = ps.emission;
-        em.rateOverTime = 3.5f;
-
-        var shape = ps.shape;
-        shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = new Vector3(12f, 7f, 1f);
-
-        var psr = mistGO.GetComponent<ParticleSystemRenderer>();
-        psr.sortingOrder = 5;
-        psr.renderMode = ParticleSystemRenderMode.Billboard;
-
-        ps.Play();
     }
 
     // =========================================================================
@@ -685,10 +657,22 @@ public class GameSceneManager : MonoBehaviour
         rtTL.sizeDelta = new Vector2(380f, 110f);
 
         // Portrait Frame Bulat
-        GameObject portFrame = CreateUIBox("PortraitFrame", topLeftPanel.transform,
-            new Vector2(88f, 88f), new Vector2(0f, 0.5f), new Vector2(48f, 0f),
-            new Color(0.18f, 0.12f, 0.28f, 0.95f));
-        CreateUIBorder(portFrame, C_GOLD, 2.5f);
+        GameObject portFrame = new GameObject("PortraitFrame");
+        portFrame.transform.SetParent(topLeftPanel.transform, false);
+        RectTransform rtPF = portFrame.AddComponent<RectTransform>();
+        rtPF.anchorMin = rtPF.anchorMax = new Vector2(0f, 0.5f);
+        rtPF.anchoredPosition = new Vector2(48f, 0f);
+        rtPF.sizeDelta = new Vector2(88f, 88f);
+        Image portBgImg = portFrame.AddComponent<Image>();
+        if (sprCirclePortBg != null)
+        {
+            portBgImg.sprite = sprCirclePortBg;
+            portBgImg.color = Color.white;
+        }
+        else
+        {
+            portBgImg.color = new Color(0.18f, 0.12f, 0.28f, 0.95f);
+        }
 
         // Wajah Aether di Portrait
         GameObject portImg = new GameObject("PortraitFace");
@@ -818,8 +802,16 @@ public class GameSceneManager : MonoBehaviour
 
         // Latar tombol lingkaran
         Image bgImg = btnGO.AddComponent<Image>();
-        bgImg.color = new Color(0.10f, 0.05f, 0.22f, 0.95f);
-        CreateUIBorder(btnGO, C_PURPLE_FX, 2.5f);
+        Sprite chosenBg = (size > 90f) ? sprCircleAtkBg : sprCircleSkillBg;
+        if (chosenBg != null)
+        {
+            bgImg.sprite = chosenBg;
+            bgImg.color = Color.white;
+        }
+        else
+        {
+            bgImg.color = new Color(0.10f, 0.05f, 0.22f, 0.95f);
+        }
 
         // Icon tombol
         if (iconSpr != null)
