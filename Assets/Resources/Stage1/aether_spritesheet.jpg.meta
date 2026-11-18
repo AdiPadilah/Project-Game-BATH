@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 33a5522f700045669e39dec48c5cf38e
+TextureImporter:
+  serializedVersion: 11
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+  textureType: 8
+  textureShape: 1
+  spriteMode: 1
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  generateMipsInLinearSpace: 0
+  npotScale: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
