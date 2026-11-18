@@ -1,1059 +1,1270 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// GameSceneManager — Scene gameplay dark fantasy "Born After The End"
-/// Memuat sprite asset nyata: Aether, tileset environment, HUD pixel art
+/// GameSceneManager v4 — 100% Sesuai Gambar Referensi #2 "Born After The End":
+/// - Perspektif: Top-Down / 2.5D Action RPG (jalan bebas di jalan batu halaman reruntuhan kuno)
+/// - Karakter: Aether (rambut perak, mantel hitam, pedang ungu, tebasan sabit energi)
+/// - Map: Reruntuhan halaman batu dengan pohon wisteria ungu, pilar batu, & atmosfer kabut
+/// - UI: Portrait Aether, HP/MP bar bersudut, Minimap kanan-atas, tombol skill melingkar kanan-bawah
 /// </summary>
 public class GameSceneManager : MonoBehaviour
 {
-    // ===== WARNA =====
-    static readonly Color COL_BG        = new Color(0.04f, 0.02f, 0.08f, 1f);
-    static readonly Color COL_GOLD      = new Color(0.98f, 0.78f, 0.30f, 1f);
-    static readonly Color COL_HP_RED    = new Color(0.80f, 0.12f, 0.12f, 1f);
-    static readonly Color COL_MP_CYAN   = new Color(0.10f, 0.65f, 0.90f, 1f);
-    static readonly Color COL_PANEL     = new Color(0.05f, 0.02f, 0.12f, 0.92f);
+    // =========================================================================
+    // WARNA TEMA DARK FANTASY
+    // =========================================================================
+    static readonly Color C_DARK_BG   = new Color(0.04f, 0.02f, 0.08f, 1f);
+    static readonly Color C_GOLD      = new Color(0.98f, 0.78f, 0.30f, 1f);
+    static readonly Color C_HP_RED    = new Color(0.85f, 0.15f, 0.18f, 1f);
+    static readonly Color C_MP_BLUE   = new Color(0.12f, 0.65f, 0.95f, 1f);
+    static readonly Color C_PURPLE_FX = new Color(0.68f, 0.22f, 0.98f, 1f);
+    static readonly Color C_PANEL     = new Color(0.05f, 0.03f, 0.12f, 0.94f);
 
-    // ===== SPRITE ASSETS =====
-    private Texture2D texAether;
-    private Texture2D texTileset;
-    private Texture2D texHUD;
-    private Sprite[] aetherFrames;   // frame animasi Aether
-    private Sprite   spriteTileset;
-    private Sprite   spriteHUD;
+    // =========================================================================
+    // SPRITE ASSETS
+    // =========================================================================
+    private Sprite sprMapCourtyard;
+    private Sprite sprAetherIdle;
+    private Sprite sprAetherWalk1;
+    private Sprite sprAetherWalk2;
+    private Sprite sprAetherRun;
+    private Sprite sprAetherAttack;
+    private Sprite sprAetherSkill;
+    private Sprite sprAetherHurt;
+    private Sprite sprAetherDie;
 
-    // ===== ANIMASI =====
-    // Layout spritesheet Aether: 4 baris
-    // Row 0 (y=top): Idle(4) + Walk(6) = 10 frame
-    // Row 1       : Run(4) + Jump(5)   = 9 frame  
-    // Row 2       : Attack(5) + Skill(4)= 9 frame
-    // Row 3 (bot) : Hurt(2) + Die(4)   = 6 frame
-    private const int FRAME_W = 10; // kolom per baris (perkiraan)
-    private const int FRAME_H = 4;  // jumlah baris
+    private Sprite sprDemonGuard;
+    private Sprite sprDemonWarden;
 
-    private int   animFrame      = 0;
-    private float animTimer      = 0f;
-    private float animSpeed      = 0.1f;
-    private string currentAnim  = "idle";
-    private int   animStart     = 0;
-    private int   animLength    = 4;
+    private Sprite sprHudTopLeft;
+    private Sprite sprHudMinimap;
+    private Sprite sprHudActionPanel;
+    private Sprite sprBtnAttack;
+    private Sprite sprBtnSkill1;
+    private Sprite sprBtnSkill2;
+    private Sprite sprBtnSkill3;
+    private Sprite sprPortrait;
+
+    // =========================================================================
+    // STATE PEMAIN (AETHER)
+    // =========================================================================
+    private GameObject playerObj;
     private SpriteRenderer playerSR;
-
-    // ===== PLAYER =====
-    private GameObject player;
     private Rigidbody2D playerRB;
-    private bool isGrounded  = false;
-    private bool facingRight = true;
-    private float moveSpeed  = 5f;
-    private float jumpForce  = 10f;
-    private float groundY    = -4.2f;
 
-    // ===== GAME STATE =====
-    private int   hpMax = 100, hpCur = 100;
-    private int   mpMax = 50,  mpCur = 50;
-    private int   level = 1,   score = 0;
-    private int   waveCount  = 0;
-    private bool  gameOver   = false;
-    private bool  paused     = false;
-    private float invincibleTimer = 0f;
+    private int hpMax = 100;
+    private int hpCur = 100;
+    private int mpMax = 50;
+    private int mpCur = 50;
+    private int score = 0;
+    private int wave  = 1;
 
-    // ===== UI REFS =====
-    private Image    hpFill, mpFill;
-    private TMP_Text hpText, mpText, scoreText, waveLabel;
-    private GameObject pausePanel, gameOverPanel;
-    private TMP_FontAsset font;
+    private float moveSpeed = 4.2f;
+    private bool  isAttacking = false;
+    private bool  isDead      = false;
+    private bool  isPaused    = false;
+    private float invincibilityTimer = 0f;
 
-    // ===== ENEMY =====
-    private List<GameObject> enemies = new List<GameObject>();
-    private float waveDelay = 20f;
+    // Animasi
+    private float walkAnimTimer = 0f;
+    private int   walkFrameIndex = 0;
+    private bool  facingRight   = true;
 
-    // ===== KAMERA =====
-    private Camera cam;
+    // =========================================================================
+    // UI REFS
+    // =========================================================================
+    private Image hpBarFill;
+    private Image mpBarFill;
+    private TMP_Text hpValueText;
+    private TMP_Text mpValueText;
+    private TMP_Text scoreValueText;
+    private TMP_Text waveValueText;
+    private RectTransform minimapPlayerMarker;
+    private GameObject pauseMenuObj;
+    private GameObject gameOverMenuObj;
+    private TMP_FontAsset mainFont;
 
-    // ================================================================
+    // =========================================================================
+    // SISTEM MUSUH
+    // =========================================================================
+    private List<GameObject> activeEnemies = new List<GameObject>();
+    private float enemySpawnInterval = 14f;
+
+    // Batas Map Courtyard (Clamping Kamera & Karakter)
+    private readonly Vector2 mapMin = new Vector2(-5.5f, -3.2f);
+    private readonly Vector2 mapMax = new Vector2( 5.5f,  3.2f);
+
+    // =========================================================================
+    // AWAKE & START
+    // =========================================================================
     void Awake()
     {
-        font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-        LoadAssets();
+        mainFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        LoadAllSprites();
     }
 
     void Start()
     {
-        BuildScene();
+        SetupCamera();
+        BuildCourtyardEnvironment();
+        SpawnAether();
+        BuildHUD();
+        BuildPauseMenu();
+        BuildGameOverMenu();
+
+        StartCoroutine(EnemyWaveRoutine());
+        StartCoroutine(PassiveManaRegen());
     }
 
-    // ================================================================
-    // LOAD SPRITE DARI RESOURCES
-    // ================================================================
-    void LoadAssets()
+    // =========================================================================
+    // 1. LOAD SPRITES DENGAN TRIPLE FALLBACK (Resources / Texture / File Langsung)
+    // =========================================================================
+    void LoadAllSprites()
     {
-        // Load Aether spritesheet
-        texAether  = LoadTex("Stage1/aether_spritesheet");
-        // Load environment tileset
-        texTileset = LoadTex("Stage1/tileset_environment");
-        // Load HUD
-        texHUD     = LoadTex("Stage1/hud_ui");
+        sprMapCourtyard = SafeLoadSprite("Stage1/map_courtyard_hd");
+        sprAetherIdle   = SafeLoadSprite("Stage1/aether_idle");
+        sprAetherWalk1  = SafeLoadSprite("Stage1/aether_walk1");
+        sprAetherWalk2  = SafeLoadSprite("Stage1/aether_walk2");
+        sprAetherRun    = SafeLoadSprite("Stage1/aether_run");
+        sprAetherAttack = SafeLoadSprite("Stage1/aether_attack");
+        sprAetherSkill  = SafeLoadSprite("Stage1/aether_skill");
+        sprAetherHurt   = SafeLoadSprite("Stage1/aether_hurt");
+        sprAetherDie    = SafeLoadSprite("Stage1/aether_die");
 
-        if (texAether != null) SliceAetherFrames();
-        if (texTileset != null) spriteTileset = Sprite.Create(texTileset,
-            new Rect(0, 0, texTileset.width, texTileset.height), new Vector2(0.5f, 0.5f), 100f);
-        if (texHUD != null) spriteHUD = Sprite.Create(texHUD,
-            new Rect(0, 0, texHUD.width, texHUD.height), new Vector2(0.5f, 0.5f), 100f);
+        sprDemonGuard   = SafeLoadSprite("Stage1/demon_guard_pixel");
+        sprDemonWarden  = SafeLoadSprite("Stage1/demon_warden_pixel");
+
+        sprHudTopLeft     = SafeLoadSprite("Stage1/hud_top_left");
+        sprHudMinimap     = SafeLoadSprite("Stage1/hud_minimap");
+        sprHudActionPanel = SafeLoadSprite("Stage1/hud_action_panel");
+        sprBtnAttack      = SafeLoadSprite("Stage1/ui_btn_attack");
+        sprBtnSkill1      = SafeLoadSprite("Stage1/ui_btn_skill1");
+        sprBtnSkill2      = SafeLoadSprite("Stage1/ui_btn_skill2");
+        sprBtnSkill3      = SafeLoadSprite("Stage1/ui_btn_skill3");
+        sprPortrait       = SafeLoadSprite("Stage1/ui_portrait");
     }
 
-    Texture2D LoadTex(string path)
+    Sprite SafeLoadSprite(string resourceSubPath)
     {
-        // Coba load sebagai Texture2D dari Resources
-        Texture2D t = Resources.Load<Texture2D>(path);
-        if (t != null) return t;
+        // Cara 1: Resources.Load<Sprite>
+        Sprite s = Resources.Load<Sprite>(resourceSubPath);
+        if (s != null) return s;
 
-        // Fallback: buat texture solid gelap
-        Texture2D fallback = new Texture2D(64, 64);
-        Color[] px = new Color[64 * 64];
-        for (int i = 0; i < px.Length; i++) px[i] = COL_BG;
-        fallback.SetPixels(px);
-        fallback.Apply();
-        Debug.LogWarning("[GameSceneManager] Asset tidak ditemukan: " + path);
-        return fallback;
-    }
-
-    /// <summary>
-    /// Potong spritesheet Aether menjadi frame individual.
-    /// Spritesheet punya 4 baris, estimasi ~10 kolom.
-    /// Idle: baris 0 kol 0-3 | Walk: baris 0 kol 4-9
-    /// Run: baris 1 kol 0-3  | Jump: baris 1 kol 4-8
-    /// Attack: baris 2 kol 0-4 | Skill: baris 2 kol 5-8
-    /// Hurt: baris 3 kol 0-1 | Die: baris 3 kol 2-5
-    /// </summary>
-    void SliceAetherFrames()
-    {
-        int tw = texAether.width;
-        int th = texAether.height;
-        int fw = tw / FRAME_W;  // lebar satu frame
-        int fh = th / FRAME_H;  // tinggi satu frame
-
-        List<Sprite> frames = new List<Sprite>();
-        for (int row = 0; row < FRAME_H; row++)
+        // Cara 2: Resources.Load<Texture2D>
+        Texture2D t = Resources.Load<Texture2D>(resourceSubPath);
+        if (t != null)
         {
-            for (int col = 0; col < FRAME_W; col++)
+            return Sprite.Create(t, new Rect(0, 0, t.width, t.height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        // Cara 3: Baca file mentah dari disk (Application.dataPath)
+        string basePath = Path.Combine(Application.dataPath, "Resources", resourceSubPath);
+        string[] candidates = new string[] { basePath + ".png", basePath + ".jpg", basePath + ".jpeg" };
+
+        foreach (string path in candidates)
+        {
+            if (File.Exists(path))
             {
-                int x = col * fw;
-                int y = th - (row + 1) * fh; // Unity Y dari bawah
-                Rect rect = new Rect(x, y, fw, fh);
-                Sprite s = Sprite.Create(texAether, rect, new Vector2(0.5f, 0.5f), (float)fh / 2f);
-                frames.Add(s);
+                byte[] bytes = File.ReadAllBytes(path);
+                Texture2D diskTex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                diskTex.filterMode = FilterMode.Bilinear;
+                if (diskTex.LoadImage(bytes))
+                {
+                    return Sprite.Create(diskTex, new Rect(0, 0, diskTex.width, diskTex.height), new Vector2(0.5f, 0.5f), 100f);
+                }
             }
         }
-        aetherFrames = frames.ToArray();
+
+        Debug.LogWarning("[GameSceneManager] Sprite tidak ditemukan di: " + resourceSubPath);
+        return null;
     }
 
-    // ================================================================
-    // BUILD SCENE
-    // ================================================================
-    void BuildScene()
-    {
-        SetupCamera();
-        BuildBackground();
-        BuildFloor();
-        BuildEnvironmentProps();
-        BuildFog();
-        SpawnPlayer();
-        BuildHUD();
-        BuildPausePanel();
-        BuildGameOverPanel();
-        StartCoroutine(WaveSpawner());
-        StartCoroutine(IntroFade());
-    }
-
-    // ================================================================
-    // KAMERA
-    // ================================================================
+    // =========================================================================
+    // 2. KAMERA TOP-DOWN
+    // =========================================================================
     void SetupCamera()
     {
-        cam = Camera.main;
+        Camera cam = Camera.main;
         if (cam == null)
         {
-            GameObject co = new GameObject("MainCamera");
-            co.tag = "MainCamera";
-            cam = co.AddComponent<Camera>();
-            co.AddComponent<AudioListener>();
+            GameObject camGO = new GameObject("MainCamera");
+            camGO.tag = "MainCamera";
+            cam = camGO.AddComponent<Camera>();
+            camGO.AddComponent<AudioListener>();
         }
+
         cam.orthographic = true;
-        cam.orthographicSize = 5.5f;
-        cam.backgroundColor = COL_BG;
+        cam.orthographicSize = 3.6f; // Zoom sempurna agar halaman terlihat pas seperti gambar 2
+        cam.backgroundColor = C_DARK_BG;
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.transform.position = new Vector3(0, 0, -10f);
     }
 
     void LateUpdate()
     {
-        if (cam == null || player == null) return;
-        Vector3 t = new Vector3(player.transform.position.x, 0.2f, -10f);
-        cam.transform.position = Vector3.Lerp(cam.transform.position, t, 6f * Time.deltaTime);
+        if (playerObj == null) return;
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // Kamera mengikuti posisi player dengan smooth damping & batas (clamping)
+        Vector3 targetPos = new Vector3(
+            Mathf.Clamp(playerObj.transform.position.x, mapMin.x * 0.45f, mapMax.x * 0.45f),
+            Mathf.Clamp(playerObj.transform.position.y, mapMin.y * 0.45f, mapMax.y * 0.45f),
+            -10f
+        );
+
+        cam.transform.position = Vector3.Lerp(cam.transform.position, targetPos, 6.5f * Time.deltaTime);
+
+        // Update minimap player marker
+        if (minimapPlayerMarker != null)
+        {
+            float normX = Mathf.InverseLerp(mapMin.x, mapMax.x, playerObj.transform.position.x);
+            float normY = Mathf.InverseLerp(mapMin.y, mapMax.y, playerObj.transform.position.y);
+            minimapPlayerMarker.anchoredPosition = new Vector2((normX - 0.5f) * 70f, (normY - 0.5f) * 60f);
+        }
     }
 
-    // ================================================================
-    // BACKGROUND — langit ungu berbintang + bulan
-    // ================================================================
-    void BuildBackground()
+    // =========================================================================
+    // 3. LINGKUNGAN MAP COURTYARD (Top-Down ARPG)
+    // =========================================================================
+    void BuildCourtyardEnvironment()
     {
-        // Langit malam gradient — gunakan bagian kanan tileset (sky panel)
-        // Buat dari warna solid dark
-        CreateWorld("Sky", new Vector3(0, 2f, 15f), new Vector2(100f, 20f),
-            new Color(0.04f, 0.02f, 0.09f, 1f), -20);
+        // Map Utama (Halaman Reruntuhan Kuno Berbatu)
+        GameObject mapGO = new GameObject("CourtyardMap");
+        mapGO.transform.position = Vector3.zero;
 
-        // Gradasi horison ungu
-        CreateWorld("Horizon", new Vector3(0, -1f, 14f), new Vector2(100f, 8f),
-            new Color(0.09f, 0.03f, 0.18f, 1f), -19);
-
-        // Bintang prosedural
-        System.Random rng = new System.Random(7);
-        for (int i = 0; i < 80; i++)
-        {
-            float sx = (float)(rng.NextDouble() * 60 - 30);
-            float sy = (float)(rng.NextDouble() * 8 + 2);
-            float ss = (float)(rng.NextDouble() * 0.07f + 0.025f);
-            float sa = (float)(rng.NextDouble() * 0.65f + 0.25f);
-            CreateCircle("Star" + i, new Vector3(sx, sy, 13f), ss,
-                new Color(1f, 0.95f, 1f, sa), -18);
-        }
-
-        // Bulan besar
-        CreateCircle("Moon", new Vector3(5f, 6.5f, 12f), 2.0f,
-            new Color(0.88f, 0.82f, 1.0f, 1f), -17);
-        CreateCircle("MoonGlow", new Vector3(5f, 6.5f, 12.1f), 3.5f,
-            new Color(0.60f, 0.35f, 0.90f, 0.12f), -18);
-    }
-
-    // ================================================================
-    // LANTAI — tilemap batu
-    // ================================================================
-    void BuildFloor()
-    {
-        // Platform dasar dengan collider
-        GameObject floor = new GameObject("Floor");
-        floor.transform.position = new Vector3(0, groundY - 0.6f, 0);
-        floor.layer = 6;
-
-        SpriteRenderer sr = floor.AddComponent<SpriteRenderer>();
-        // Gunakan bagian tileset (ground tile) — potong dari texTileset kiri-bawah
-        if (texTileset != null)
-        {
-            int tw = texTileset.width / 2; // setengah kiri = ground tile
-            int th = texTileset.height / 3;
-            Rect tileRect = new Rect(0, 0, tw, th);
-            sr.sprite = Sprite.Create(texTileset, tileRect, new Vector2(0.5f, 0.5f), (float)th);
-            sr.drawMode = SpriteDrawMode.Tiled;
-            sr.size = new Vector2(80f, 2.5f);
-        }
-        else
-        {
-            sr.sprite = MakeSolidSprite(new Color(0.14f, 0.09f, 0.22f, 1f));
-            floor.transform.localScale = new Vector3(80f, 2.5f, 1f);
-        }
+        SpriteRenderer sr = mapGO.AddComponent<SpriteRenderer>();
+        sr.sprite = sprMapCourtyard;
         sr.sortingOrder = -10;
-        floor.AddComponent<BoxCollider2D>().size =
-            new Vector2(80f, 2.5f);
+        mapGO.transform.localScale = Vector3.one * 1.0f;
 
-        // Garis emas tipis di tepi atas lantai
-        CreateWorld("FloorEdge", new Vector3(0, groundY + 0.09f, 0),
-            new Vector2(80f, 0.07f), new Color(0.98f, 0.78f, 0.30f, 0.5f), -9);
+        // Pembatas Tembok Luar (Invisible Wall Colliders)
+        AddWallCollider("Wall_North", new Vector2(0f, 3.5f),  new Vector2(14f, 1f));
+        AddWallCollider("Wall_South", new Vector2(0f, -3.5f), new Vector2(14f, 1f));
+        AddWallCollider("Wall_West",  new Vector2(-6.2f, 0f), new Vector2(1f, 8f));
+        AddWallCollider("Wall_East",  new Vector2(6.2f, 0f),  new Vector2(1f, 8f));
 
-        // Platform melayang 1 (kiri)
-        BuildPlatform(new Vector3(-8f, -1.5f, 0f), new Vector2(5.5f, 0.4f));
-        // Platform melayang 2 (tengah)
-        BuildPlatform(new Vector3(2f,  -0.3f, 0f), new Vector2(4.0f, 0.4f));
-        // Platform melayang 3 (kanan)
-        BuildPlatform(new Vector3(11f, -1.2f, 0f), new Vector2(5.0f, 0.4f));
+        // Reruntuhan Pilar Kiri & Kanan (Pilar Colliders agar Aether bisa kelilingi)
+        AddObstacle("PillarArch_Left",  new Vector2(-2.8f, 1.2f), new Vector2(1.2f, 1.5f));
+        AddObstacle("PillarArch_Right", new Vector2( 2.8f, 1.2f), new Vector2(1.2f, 1.5f));
+        AddObstacle("Ruins_BottomLeft", new Vector2(-3.0f, -1.8f), new Vector2(1.5f, 1.0f));
+        AddObstacle("Ruins_BottomRight",new Vector2( 3.0f, -1.8f), new Vector2(1.5f, 1.0f));
+
+        // Partikel Kabut Ungu Melayang di Courtyard
+        BuildAtmosphericMist();
     }
 
-    void BuildPlatform(Vector3 pos, Vector2 size)
+    void AddWallCollider(string name, Vector2 pos, Vector2 size)
     {
-        GameObject p = new GameObject("Platform");
-        p.transform.position = pos;
-        p.layer = 6;
-
-        SpriteRenderer sr = p.AddComponent<SpriteRenderer>();
-        if (texTileset != null)
-        {
-            int tw = texTileset.width / 2;
-            int th = texTileset.height / 3;
-            sr.sprite = Sprite.Create(texTileset, new Rect(0, 0, tw, th),
-                new Vector2(0.5f, 0.5f), (float)th);
-            sr.drawMode = SpriteDrawMode.Tiled;
-            sr.size = size;
-        }
-        else
-        {
-            sr.sprite = MakeSolidSprite(new Color(0.14f, 0.09f, 0.22f, 1f));
-            p.transform.localScale = new Vector3(size.x, size.y, 1f);
-        }
-        sr.sortingOrder = -9;
-
-        BoxCollider2D bc = p.AddComponent<BoxCollider2D>();
+        GameObject wall = new GameObject(name);
+        wall.transform.position = pos;
+        wall.layer = 6; // Ground/Obstacle
+        BoxCollider2D bc = wall.AddComponent<BoxCollider2D>();
         bc.size = size;
-
-        // Tepi emas
-        CreateWorld("PlatEdge" + pos.x,
-            new Vector3(pos.x, pos.y + size.y * 0.5f + 0.03f, 0),
-            new Vector2(size.x, 0.06f),
-            new Color(0.98f, 0.78f, 0.30f, 0.55f), -8);
     }
 
-    // ================================================================
-    // ENVIRONMENT PROPS — pohon, nisan, pilar dari tileset
-    // ================================================================
-    void BuildEnvironmentProps()
+    void AddObstacle(string name, Vector2 pos, Vector2 size)
     {
-        // Pohon teal (dari tileset bagian bawah-tengah)
-        PlaceProp("TreeTeal1", new Vector3(-16f, groundY + 1.8f, -1f), 2.2f, GetTreeTealSprite());
-        PlaceProp("TreeTeal2", new Vector3(18f,  groundY + 2.0f, -1f), 2.0f, GetTreeTealSprite());
-        PlaceProp("TreeDark1", new Vector3(-24f, groundY + 1.5f, -1f), 1.8f, GetTreeDarkSprite());
-        PlaceProp("TreeDark2", new Vector3(26f,  groundY + 1.5f, -1f), 1.9f, GetTreeDarkSprite());
-
-        // Nisan (dari tileset)
-        PlaceProp("Grave1", new Vector3(-12f, groundY + 0.6f, -0.5f), 1.0f, GetGraveSprite());
-        PlaceProp("Grave2", new Vector3(-5f,  groundY + 0.6f, -0.5f), 0.8f, GetGraveSprite());
-        PlaceProp("Grave3", new Vector3(8f,   groundY + 0.6f, -0.5f), 1.0f, GetGraveSprite());
-        PlaceProp("Grave4", new Vector3(15f,  groundY + 0.6f, -0.5f), 0.9f, GetGraveSprite());
-
-        // Pilar reruntuhan
-        PlaceProp("Pillar1", new Vector3(-20f, groundY + 1.5f, -0.8f), 1.5f, GetPillarSprite());
-        PlaceProp("Pillar2", new Vector3(22f,  groundY + 1.5f, -0.8f), 1.3f, GetPillarSprite());
+        GameObject obs = new GameObject(name);
+        obs.transform.position = pos;
+        obs.layer = 6;
+        BoxCollider2D bc = obs.AddComponent<BoxCollider2D>();
+        bc.size = size;
     }
 
-    // Ambil region sprite dari tileset
-    Sprite GetTreeTealSprite()  => CropTileset(0.50f, 0.00f, 0.22f, 0.45f);
-    Sprite GetTreeDarkSprite()  => CropTileset(0.72f, 0.00f, 0.15f, 0.45f);
-    Sprite GetGraveSprite()     => CropTileset(0.50f, 0.45f, 0.12f, 0.28f);
-    Sprite GetPillarSprite()    => CropTileset(0.63f, 0.45f, 0.10f, 0.35f);
-
-    // Crop region dari texTileset (normalized 0-1)
-    Sprite CropTileset(float nx, float ny, float nw, float nh)
+    void BuildAtmosphericMist()
     {
-        if (texTileset == null) return MakeSolidSprite(new Color(0.2f, 0.1f, 0.3f, 1f));
-        int tw = texTileset.width, th = texTileset.height;
-        Rect r = new Rect(nx * tw, ny * th, nw * tw, nh * th);
-        // Balik Y karena Unity dari bawah
-        r.y = th - r.y - r.height;
-        r.y = Mathf.Max(0, r.y);
-        r.height = Mathf.Min(r.height, th - r.y);
-        return Sprite.Create(texTileset, r, new Vector2(0.5f, 0f), r.height);
-    }
+        GameObject mistGO = new GameObject("CourtyardMistParticles");
+        mistGO.transform.position = new Vector3(0, 0, -1f);
 
-    void PlaceProp(string name, Vector3 pos, float scale, Sprite spr)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.position = pos;
-        go.transform.localScale = Vector3.one * scale;
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = spr ?? MakeSolidSprite(new Color(0.2f, 0.1f, 0.3f));
-        sr.sortingOrder = -5;
-    }
-
-    // ================================================================
-    // KABUT UNGU
-    // ================================================================
-    void BuildFog()
-    {
-        // Strip kabut bawah dari tileset (baris paling bawah, bagian kanan)
-        Sprite fogSprite = CropTileset(0.50f, 0.75f, 0.50f, 0.25f);
-
-        CreateFogStrip("FogLow",  new Vector3(0, groundY + 0.3f, -2f), fogSprite);
-        CreateFogStrip("FogMid",  new Vector3(0, 0.5f, -1.5f),         fogSprite);
-
-        // Partikel kabut
-        GameObject fogObj = new GameObject("FogParticles");
-        fogObj.transform.position = new Vector3(0, groundY + 0.5f, -2f);
-        ParticleSystem ps = fogObj.AddComponent<ParticleSystem>();
+        ParticleSystem ps = mistGO.AddComponent<ParticleSystem>();
         var main = ps.main;
-        main.startLifetime   = new ParticleSystem.MinMaxCurve(5f, 10f);
-        main.startSpeed      = new ParticleSystem.MinMaxCurve(0.05f, 0.20f);
-        main.startSize       = new ParticleSystem.MinMaxCurve(0.5f, 1.8f);
-        main.startColor      = new ParticleSystem.MinMaxGradient(
-            new Color(0.35f, 0.08f, 0.70f, 0.07f),
-            new Color(0.55f, 0.18f, 0.90f, 0.16f));
-        main.maxParticles    = 50;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(6f, 11f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.04f, 0.15f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.8f, 2.2f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.40f, 0.10f, 0.75f, 0.08f),
+            new Color(0.60f, 0.20f, 0.95f, 0.16f)
+        );
+        main.maxParticles = 50;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.loop = true;
-        var em = ps.emission; em.rateOverTime = 3f;
-        var sh = ps.shape;
-        sh.shapeType = ParticleSystemShapeType.Box;
-        sh.scale = new Vector3(60f, 4f, 1f);
-        fogObj.GetComponent<ParticleSystemRenderer>().sortingOrder = -2;
+
+        var em = ps.emission;
+        em.rateOverTime = 3.5f;
+
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(12f, 7f, 1f);
+
+        var psr = mistGO.GetComponent<ParticleSystemRenderer>();
+        psr.sortingOrder = 5;
+        psr.renderMode = ParticleSystemRenderMode.Billboard;
+
         ps.Play();
     }
 
-    void CreateFogStrip(string name, Vector3 pos, Sprite spr)
+    // =========================================================================
+    // 4. SPAWN PEMAIN (AETHER)
+    // =========================================================================
+    void SpawnAether()
     {
-        GameObject go = new GameObject(name);
-        go.transform.position = pos;
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = spr ?? MakeSolidSprite(new Color(0.3f, 0.05f, 0.6f, 0.15f));
-        sr.color = new Color(1f, 1f, 1f, 0.35f);
-        sr.sortingOrder = -3;
-        go.transform.localScale = new Vector3(10f, 1f, 1f);
-    }
+        playerObj = new GameObject("Aether_Hero");
+        playerObj.tag = "Player";
+        playerObj.layer = 8; // Player
+        playerObj.transform.position = new Vector3(0f, -0.6f, 0f); // Berdiri di tengah jalan batu
 
-    // ================================================================
-    // PLAYER SPAWN
-    // ================================================================
-    void SpawnPlayer()
-    {
-        player = GameObject.FindGameObjectWithTag("Player");
-        if (player == null)
-        {
-            player = new GameObject("Aether");
-            player.tag   = "Player";
-            player.layer = 8;
-        }
-
-        player.transform.position = new Vector3(-7f, groundY + 0.6f, 0f);
-
-        // Sprite Renderer
-        playerSR = player.GetComponent<SpriteRenderer>();
-        if (playerSR == null) playerSR = player.AddComponent<SpriteRenderer>();
-
-        if (aetherFrames != null && aetherFrames.Length > 0)
-            playerSR.sprite = aetherFrames[0];
-        else
-            playerSR.sprite = MakeSolidSprite(new Color(0.7f, 0.7f, 0.9f, 1f));
-
+        playerSR = playerObj.AddComponent<SpriteRenderer>();
+        playerSR.sprite = sprAetherIdle;
         playerSR.sortingOrder = 10;
-        player.transform.localScale = new Vector3(1.2f, 1.2f, 1f);
+        playerObj.transform.localScale = Vector3.one * 0.55f; // Skala pas proporsional dengan pilar
 
-        // Fisika
-        playerRB = player.GetComponent<Rigidbody2D>();
-        if (playerRB == null)
-        {
-            playerRB = player.AddComponent<Rigidbody2D>();
-            playerRB.freezeRotation = true;
-            playerRB.gravityScale   = 4f;
-            playerRB.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        }
+        playerRB = playerObj.AddComponent<Rigidbody2D>();
+        playerRB.bodyType = RigidbodyType2D.Dynamic;
+        playerRB.gravityScale = 0f; // TOP-DOWN (tidak jatuh ke bawah!)
+        playerRB.freezeRotation = true;
+        playerRB.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-        CapsuleCollider2D cc = player.GetComponent<CapsuleCollider2D>();
-        if (cc == null)
-        {
-            cc = player.AddComponent<CapsuleCollider2D>();
-            cc.size = new Vector2(0.6f, 1.0f);
-        }
+        // Kaki collider untuk navigasi top-down
+        CircleCollider2D cc = playerObj.AddComponent<CircleCollider2D>();
+        cc.radius = 0.45f;
+        cc.offset = new Vector2(0f, -0.4f);
 
-        // Audio
-        if (player.GetComponent<AudioSource>() == null)
-            player.AddComponent<AudioSource>().playOnAwake = false;
+        // Audio Source untuk sfx serangan
+        AudioSource aud = playerObj.AddComponent<AudioSource>();
+        aud.playOnAwake = false;
 
-        // Ground check child
-        GameObject gc = new GameObject("GroundCheck");
-        gc.transform.SetParent(player.transform);
-        gc.transform.localPosition = new Vector3(0, -0.55f, 0);
+        // Efek aura pedang ungu halus
+        GameObject swordAura = new GameObject("SwordGlow");
+        swordAura.transform.SetParent(playerObj.transform, false);
+        swordAura.transform.localPosition = new Vector2(0.35f, -0.2f);
+        SpriteRenderer auraSR = swordAura.AddComponent<SpriteRenderer>();
+        auraSR.sprite = MakeGlowOrbSprite(32);
+        auraSR.color = new Color(0.65f, 0.20f, 1.0f, 0.35f);
+        auraSR.sortingOrder = 9;
+        swordAura.transform.localScale = Vector3.one * 0.8f;
     }
 
-    // ================================================================
-    // UPDATE — input + animasi player
-    // ================================================================
+    // =========================================================================
+    // 5. UPDATE: KONTROL 8-ARAH & KOMBAK TOP-DOWN
+    // =========================================================================
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape)) TogglePause();
-        if (gameOver || paused) return;
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            TogglePause();
+        }
 
-        HandlePlayerInput();
-        UpdateAnimation();
-        CheckGround();
+        if (isDead || isPaused) return;
 
-        if (invincibleTimer > 0f) invincibleTimer -= Time.deltaTime;
-        enemies.RemoveAll(e => e == null);
+        if (invincibilityTimer > 0f)
+        {
+            invincibilityTimer -= Time.deltaTime;
+        }
+
+        HandleMovementInput();
+        HandleCombatInput();
+
+        // Bersihkan musuh mati
+        activeEnemies.RemoveAll(e => e == null);
     }
 
-    void HandlePlayerInput()
+    void HandleMovementInput()
     {
-        if (player == null || playerRB == null) return;
+        if (playerObj == null || playerRB == null || isAttacking) return;
 
         float h = Input.GetAxisRaw("Horizontal");
-        playerRB.velocity = new Vector2(h * moveSpeed, playerRB.velocity.y);
+        float v = Input.GetAxisRaw("Vertical");
 
-        // Flip
-        if (h > 0 && !facingRight) { facingRight = true;  player.transform.localScale = new Vector3( 1.2f, 1.2f, 1f); }
-        if (h < 0 &&  facingRight) { facingRight = false; player.transform.localScale = new Vector3(-1.2f, 1.2f, 1f); }
+        Vector2 inputDir = new Vector2(h, v).normalized;
+        playerRB.velocity = inputDir * moveSpeed;
 
-        // Lompat
-        if ((Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W)) && isGrounded)
+        // Flip arah pandang horizontal
+        if (h > 0.05f && !facingRight)
         {
-            playerRB.velocity = new Vector2(playerRB.velocity.x, jumpForce);
-            SetAnim("jump", 20, 3);
+            facingRight = true;
+            playerObj.transform.localScale = new Vector3(0.55f, 0.55f, 1f);
+        }
+        else if (h < -0.05f && facingRight)
+        {
+            facingRight = false;
+            playerObj.transform.localScale = new Vector3(-0.55f, 0.55f, 1f);
         }
 
-        // Serangan A
-        if (Input.GetKeyDown(KeyCode.A)) StartCoroutine(AttackAnim());
-        // Skill S
-        if (Input.GetKeyDown(KeyCode.S) && mpCur >= 10) StartCoroutine(SkillAnim());
-
-        // Anim berjalan
-        if (isGrounded && currentAnim != "attack" && currentAnim != "skill")
+        // Animasi Gerak
+        if (inputDir.sqrMagnitude > 0.01f)
         {
-            if (Mathf.Abs(h) > 0.1f)
-                SetAnim("walk", 4, 6);
-            else
-                SetAnim("idle", 0, 4);
-        }
-    }
-
-    void CheckGround()
-    {
-        if (player == null) return;
-        Transform gc = player.transform.Find("GroundCheck");
-        if (gc == null) return;
-        isGrounded = Physics2D.OverlapCircle(gc.position, 0.15f,
-            LayerMask.GetMask("Ground"));
-    }
-
-    // ================================================================
-    // ANIMASI
-    // ================================================================
-    // Mapping frame ke indeks spritesheet (4 baris x 10 col):
-    // idle    : baris 0, kol 0-3  → idx 0-3
-    // walk    : baris 0, kol 4-9  → idx 4-9
-    // run     : baris 1, kol 0-3  → idx 10-13
-    // jump    : baris 1, kol 4-8  → idx 14-18
-    // attack  : baris 2, kol 0-4  → idx 20-24
-    // skill   : baris 2, kol 5-8  → idx 25-28
-    // hurt    : baris 3, kol 0-1  → idx 30-31
-    // die     : baris 3, kol 2-5  → idx 32-35
-
-    void SetAnim(string name, int startIdx, int length)
-    {
-        if (currentAnim == name) return;
-        currentAnim = name;
-        animStart   = startIdx;
-        animLength  = length;
-        animFrame   = 0;
-        animTimer   = 0f;
-    }
-
-    void UpdateAnimation()
-    {
-        if (aetherFrames == null || aetherFrames.Length == 0) return;
-        animTimer += Time.deltaTime;
-        if (animTimer >= animSpeed)
-        {
-            animTimer = 0f;
-            animFrame = (animFrame + 1) % animLength;
-            int idx = animStart + animFrame;
-            if (idx < aetherFrames.Length && playerSR != null)
-                playerSR.sprite = aetherFrames[idx];
-        }
-    }
-
-    IEnumerator AttackAnim()
-    {
-        SetAnim("attack", 20, 5);
-        DealDamageToNearbyEnemies(2.0f, 15);
-        yield return new WaitForSeconds(0.5f);
-        if (isGrounded) SetAnim("idle", 0, 4);
-    }
-
-    IEnumerator SkillAnim()
-    {
-        if (mpCur < 10) yield break;
-        mpCur -= 10;
-        RefreshHUD();
-        SetAnim("skill", 25, 4);
-        DealDamageToNearbyEnemies(4.0f, 25);
-        SpawnSkillFX(player.transform.position);
-        yield return new WaitForSeconds(0.6f);
-        if (isGrounded) SetAnim("idle", 0, 4);
-    }
-
-    void DealDamageToNearbyEnemies(float radius, int dmg)
-    {
-        foreach (var e in enemies)
-        {
-            if (e == null) continue;
-            if (Vector2.Distance(e.transform.position, player.transform.position) <= radius)
+            walkAnimTimer += Time.deltaTime;
+            if (walkAnimTimer >= 0.14f)
             {
-                GraveWalkerAI ai = e.GetComponent<GraveWalkerAI>();
-                if (ai != null) ai.TakeDamage(dmg);
+                walkAnimTimer = 0f;
+                walkFrameIndex = (walkFrameIndex + 1) % 2;
+                playerSR.sprite = (walkFrameIndex == 0) ? sprAetherWalk1 : sprAetherWalk2;
+            }
+        }
+        else
+        {
+            walkAnimTimer = 0f;
+            playerSR.sprite = sprAetherIdle;
+        }
+    }
+
+    void HandleCombatInput()
+    {
+        if (isAttacking) return;
+
+        // Tombol Serang Biasa: J, Z, Space, atau Klik Kiri
+        if (Input.GetKeyDown(KeyCode.J) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+        {
+            PerformBasicAttack();
+        }
+
+        // Skill 1: K atau 1 (Tebasan Sabit Cepat)
+        if (Input.GetKeyDown(KeyCode.K) || Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            PerformSkill1();
+        }
+
+        // Skill 2: L atau 2 (Badai Energi Abyssal)
+        if (Input.GetKeyDown(KeyCode.L) || Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            PerformSkill2();
+        }
+
+        // Skill 3: I atau 3 (Kiamat Bayangan Gelap)
+        if (Input.GetKeyDown(KeyCode.I) || Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            PerformSkill3();
+        }
+    }
+
+    // =========================================================================
+    // SERANGAN & SKILL AETHER
+    // =========================================================================
+    public void PerformBasicAttack()
+    {
+        if (isAttacking || isDead) return;
+        StartCoroutine(BasicAttackRoutine());
+    }
+
+    IEnumerator BasicAttackRoutine()
+    {
+        isAttacking = true;
+        playerRB.velocity = Vector2.zero;
+
+        // Tampilkan pose tebasan Aether dengan sabit ungu
+        if (sprAetherAttack != null) playerSR.sprite = sprAetherAttack;
+
+        // Spawn gelombang sabit ungu meluncur
+        Vector2 slashDir = facingRight ? Vector2.right : Vector2.left;
+        SpawnSlashWave(playerObj.transform.position + new Vector3(slashDir.x * 0.7f, 0.1f, 0f), slashDir, 25);
+
+        // Beri damage ke musuh di depan
+        HitEnemiesInCone(playerObj.transform.position, slashDir, 2.2f, 25);
+
+        yield return new WaitForSeconds(0.32f);
+
+        isAttacking = false;
+        playerSR.sprite = sprAetherIdle;
+    }
+
+    public void PerformSkill1()
+    {
+        if (isAttacking || isDead || mpCur < 12) return;
+        mpCur -= 12;
+        UpdateHUDValues();
+        StartCoroutine(Skill1Routine());
+    }
+
+    IEnumerator Skill1Routine()
+    {
+        isAttacking = true;
+        playerSR.sprite = sprAetherAttack;
+
+        // Dash cepat ke depan dengan jejak bayangan ungu
+        Vector2 dashDir = facingRight ? Vector2.right : Vector2.left;
+        playerRB.velocity = dashDir * 12f;
+
+        // Efek tebasan ganda
+        SpawnSlashWave(playerObj.transform.position + new Vector3(dashDir.x * 0.9f, 0.2f, 0f), dashDir, 40);
+        HitEnemiesInCone(playerObj.transform.position, dashDir, 3.2f, 40);
+
+        yield return new WaitForSeconds(0.20f);
+        playerRB.velocity = Vector2.zero;
+
+        yield return new WaitForSeconds(0.18f);
+        isAttacking = false;
+        playerSR.sprite = sprAetherIdle;
+    }
+
+    public void PerformSkill2()
+    {
+        if (isAttacking || isDead || mpCur < 20) return;
+        mpCur -= 20;
+        UpdateHUDValues();
+        StartCoroutine(Skill2Routine());
+    }
+
+    IEnumerator Skill2Routine()
+    {
+        isAttacking = true;
+        playerRB.velocity = Vector2.zero;
+        playerSR.sprite = sprAetherSkill;
+
+        // Ledakan radial 360 derajat
+        SpawnRadialSkillBurst(playerObj.transform.position, 3.5f, 50);
+
+        yield return new WaitForSeconds(0.45f);
+        isAttacking = false;
+        playerSR.sprite = sprAetherIdle;
+    }
+
+    public void PerformSkill3()
+    {
+        if (isAttacking || isDead || mpCur < 35) return;
+        mpCur -= 35;
+        UpdateHUDValues();
+        StartCoroutine(Skill3Routine());
+    }
+
+    IEnumerator Skill3Routine()
+    {
+        isAttacking = true;
+        playerRB.velocity = Vector2.zero;
+        playerSR.sprite = sprAetherSkill;
+
+        // Ultimate: Hantaman Pilar Cahaya Ungu ke Semua Musuh di Courtyard
+        foreach (var enemy in activeEnemies)
+        {
+            if (enemy != null)
+            {
+                SpawnPillarOfLight(enemy.transform.position);
+                enemy.GetComponent<DemonCourtyardAI>()?.TakeDamage(80);
+            }
+        }
+
+        SpawnRadialSkillBurst(playerObj.transform.position, 5.0f, 60);
+
+        yield return new WaitForSeconds(0.60f);
+        isAttacking = false;
+        playerSR.sprite = sprAetherIdle;
+    }
+
+    void SpawnSlashWave(Vector3 pos, Vector2 dir, int damage)
+    {
+        GameObject slash = new GameObject("PurpleSlashWave");
+        slash.transform.position = pos;
+        slash.transform.localScale = new Vector3(facingRight ? 1.4f : -1.4f, 1.4f, 1f);
+
+        SpriteRenderer sr = slash.AddComponent<SpriteRenderer>();
+        sr.sprite = MakeCrescentSlashSprite(64);
+        sr.color = new Color(0.85f, 0.35f, 1.0f, 0.95f);
+        sr.sortingOrder = 15;
+
+        StartCoroutine(AnimateSlash(slash, dir));
+    }
+
+    IEnumerator AnimateSlash(GameObject slash, Vector2 dir)
+    {
+        float timer = 0f;
+        Vector3 start = slash.transform.position;
+        while (timer < 0.28f)
+        {
+            timer += Time.deltaTime;
+            if (slash == null) yield break;
+            slash.transform.position = start + (Vector3)(dir * timer * 6f);
+            SpriteRenderer sr = slash.GetComponent<SpriteRenderer>();
+            if (sr != null) sr.color = new Color(0.85f, 0.35f, 1.0f, 1f - (timer / 0.28f));
+            yield return null;
+        }
+        if (slash != null) Destroy(slash);
+    }
+
+    void SpawnRadialSkillBurst(Vector3 center, float radius, int damage)
+    {
+        // 8 proyektil melingkar
+        for (int i = 0; i < 8; i++)
+        {
+            float ang = i * 45f * Mathf.Deg2Rad;
+            Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+
+            GameObject orb = new GameObject("BurstOrb");
+            orb.transform.position = center + (Vector3)(dir * 0.4f);
+            SpriteRenderer sr = orb.AddComponent<SpriteRenderer>();
+            sr.sprite = MakeGlowOrbSprite(32);
+            sr.color = C_PURPLE_FX;
+            sr.sortingOrder = 16;
+            orb.transform.localScale = Vector3.one * 0.6f;
+
+            StartCoroutine(AnimateSlash(orb, dir));
+        }
+
+        // Damage melingkar
+        foreach (var enemy in activeEnemies)
+        {
+            if (enemy != null && Vector2.Distance(center, enemy.transform.position) <= radius)
+            {
+                enemy.GetComponent<DemonCourtyardAI>()?.TakeDamage(damage);
             }
         }
     }
 
-    void SpawnSkillFX(Vector3 pos)
+    void SpawnPillarOfLight(Vector3 pos)
     {
-        for (int i = 0; i < 8; i++)
-        {
-            GameObject fx = new GameObject("SkillFX");
-            fx.transform.position = pos;
-            SpriteRenderer sr = fx.AddComponent<SpriteRenderer>();
-            sr.sprite = MakeCircleSprite(32);
-            float angle = i * 45f * Mathf.Deg2Rad;
-            sr.color = new Color(0.6f, 0.1f, 1.0f, 0.8f);
-            sr.sortingOrder = 20;
-            fx.transform.localScale = Vector3.one * 0.3f;
-            StartCoroutine(MoveFX(fx, new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * 3f));
-        }
+        GameObject pillar = new GameObject("PurplePillarFX");
+        pillar.transform.position = pos + new Vector3(0, 1.2f, 0);
+        pillar.transform.localScale = new Vector3(0.6f, 3.5f, 1f);
+
+        SpriteRenderer sr = pillar.AddComponent<SpriteRenderer>();
+        sr.sprite = MakeSolidQuadSprite(new Color(0.85f, 0.3f, 1.0f, 0.85f));
+        sr.sortingOrder = 18;
+
+        StartCoroutine(FadeAndDestroy(pillar, 0.35f));
     }
 
-    IEnumerator MoveFX(GameObject fx, Vector2 dir)
+    IEnumerator FadeAndDestroy(GameObject go, float duration)
     {
         float t = 0f;
-        Vector3 start = fx.transform.position;
-        while (t < 0.4f)
+        SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
+        Color startCol = sr ? sr.color : Color.white;
+        while (t < duration)
         {
             t += Time.deltaTime;
-            if (fx == null) yield break;
-            fx.transform.position = start + new Vector3(dir.x, dir.y, 0) * (t / 0.4f) * 2f;
-            SpriteRenderer sr = fx.GetComponent<SpriteRenderer>();
-            if (sr) sr.color = new Color(0.6f, 0.1f, 1.0f, 1f - t / 0.4f);
+            if (go == null) yield break;
+            if (sr != null) sr.color = new Color(startCol.r, startCol.g, startCol.b, startCol.a * (1f - t / duration));
             yield return null;
         }
-        if (fx != null) Destroy(fx);
+        if (go != null) Destroy(go);
     }
 
-    // ================================================================
-    // HUD — Pakai gambar hud_ui sebagai background + TMP overlay
-    // ================================================================
+    void HitEnemiesInCone(Vector3 origin, Vector2 dir, float range, int dmg)
+    {
+        foreach (var enemy in activeEnemies)
+        {
+            if (enemy == null) continue;
+            Vector2 toEnemy = (enemy.transform.position - origin);
+            if (toEnemy.magnitude <= range && Vector2.Dot(dir, toEnemy.normalized) > 0.35f)
+            {
+                enemy.GetComponent<DemonCourtyardAI>()?.TakeDamage(dmg);
+            }
+        }
+    }
+
+    // =========================================================================
+    // 6. HUD BERSIH & PRESISI (Sesuai 100% dengan Gambar #2)
+    // =========================================================================
     void BuildHUD()
     {
-        GameObject canvasObj = new GameObject("HUD_Canvas");
-        Canvas canvas = canvasObj.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
-        CanvasScaler cs = canvasObj.AddComponent<CanvasScaler>();
+        GameObject canvasGO = new GameObject("HUD_Canvas");
+        Canvas cv = canvasGO.AddComponent<Canvas>();
+        cv.renderMode = RenderMode.ScreenSpaceOverlay;
+        cv.sortingOrder = 100;
+
+        CanvasScaler cs = canvasGO.AddComponent<CanvasScaler>();
         cs.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         cs.referenceResolution = new Vector2(1920, 1080);
         cs.matchWidthOrHeight = 0.5f;
-        canvasObj.AddComponent<GraphicRaycaster>();
 
-        // ===== HUD IMAGE kiri-atas =====
-        // Render gambar hud_ui.jpg sebagai background (dipotong sepertiga kiri = portrait+bar)
-        GameObject hudBG = MakeRawUIImg("HUD_BG", canvasObj.transform,
-            new Vector2(420, 110), new Vector2(0, 1), new Vector2(0, 1),
-            new Vector2(10, -10));
+        canvasGO.AddComponent<GraphicRaycaster>();
 
-        if (texHUD != null)
+        // -------------------------------------------------------------
+        // A. PANEL KIRI ATAS: PORTRAIT + LV.1 + HP/MP BARS
+        // -------------------------------------------------------------
+        GameObject topLeftPanel = new GameObject("HUD_TopLeft_Panel");
+        topLeftPanel.transform.SetParent(canvasGO.transform, false);
+        RectTransform rtTL = topLeftPanel.AddComponent<RectTransform>();
+        rtTL.anchorMin = rtTL.anchorMax = new Vector2(0f, 1f);
+        rtTL.pivot = new Vector2(0f, 1f);
+        rtTL.anchoredPosition = new Vector2(30f, -25f);
+        rtTL.sizeDelta = new Vector2(380f, 110f);
+
+        // Portrait Frame Bulat
+        GameObject portFrame = CreateUIBox("PortraitFrame", topLeftPanel.transform,
+            new Vector2(88f, 88f), new Vector2(0f, 0.5f), new Vector2(48f, 0f),
+            new Color(0.18f, 0.12f, 0.28f, 0.95f));
+        CreateUIBorder(portFrame, C_GOLD, 2.5f);
+
+        // Wajah Aether di Portrait
+        GameObject portImg = new GameObject("PortraitFace");
+        portImg.transform.SetParent(portFrame.transform, false);
+        Image pFace = portImg.AddComponent<Image>();
+        pFace.sprite = (sprPortrait != null) ? sprPortrait : sprAetherIdle;
+        pFace.preserveAspect = true;
+        RectTransform rtFace = portImg.GetComponent<RectTransform>();
+        rtFace.sizeDelta = new Vector2(74f, 74f);
+
+        // Badge Level "Lv. 1"
+        CreateUIText("LvText", topLeftPanel.transform, "Lv. 1",
+            new Vector2(90f, 24f), new Vector2(0f, 1f), new Vector2(150f, -18f),
+            14f, C_GOLD, TextAlignmentOptions.Left);
+
+        // HP BAR (Merah)
+        GameObject hpBG = CreateUIBox("HP_Bar_BG", topLeftPanel.transform,
+            new Vector2(230f, 22f), new Vector2(0f, 1f), new Vector2(235f, -48f),
+            new Color(0.16f, 0.05f, 0.05f, 0.95f));
+        CreateUIBorder(hpBG, new Color(0.5f, 0.15f, 0.15f, 1f), 1.5f);
+
+        GameObject hpFillGO = CreateUIBox("HP_Bar_Fill", hpBG.transform,
+            new Vector2(226f, 18f), new Vector2(0f, 0.5f), new Vector2(113f, 0f),
+            C_HP_RED);
+        hpBarFill = hpFillGO.GetComponent<Image>();
+        hpBarFill.type = Image.Type.Filled;
+        hpBarFill.fillMethod = Image.FillMethod.Horizontal;
+        hpBarFill.fillAmount = 1f;
+
+        hpValueText = CreateUIText("HP_Text", hpBG.transform, "HP  100 / 100",
+            new Vector2(220f, 20f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            12f, Color.white, TextAlignmentOptions.Center);
+
+        // MP BAR (Biru Cyan)
+        GameObject mpBG = CreateUIBox("MP_Bar_BG", topLeftPanel.transform,
+            new Vector2(230f, 20f), new Vector2(0f, 1f), new Vector2(235f, -76f),
+            new Color(0.04f, 0.08f, 0.18f, 0.95f));
+        CreateUIBorder(mpBG, new Color(0.15f, 0.35f, 0.65f, 1f), 1.5f);
+
+        GameObject mpFillGO = CreateUIBox("MP_Bar_Fill", mpBG.transform,
+            new Vector2(226f, 16f), new Vector2(0f, 0.5f), new Vector2(113f, 0f),
+            C_MP_BLUE);
+        mpBarFill = mpFillGO.GetComponent<Image>();
+        mpBarFill.type = Image.Type.Filled;
+        mpBarFill.fillMethod = Image.FillMethod.Horizontal;
+        mpBarFill.fillAmount = 1f;
+
+        mpValueText = CreateUIText("MP_Text", mpBG.transform, "MP  50 / 50",
+            new Vector2(220f, 18f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            11.5f, Color.white, TextAlignmentOptions.Center);
+
+        // -------------------------------------------------------------
+        // B. PANEL KANAN ATAS: MINIMAP DUNGEON
+        // -------------------------------------------------------------
+        GameObject minimapCard = CreateUIBox("HUD_Minimap_Card", canvasGO.transform,
+            new Vector2(140f, 110f), new Vector2(1f, 1f), new Vector2(-95f, -75f),
+            new Color(0.06f, 0.04f, 0.14f, 0.92f));
+        CreateUIBorder(minimapCard, new Color(0.55f, 0.30f, 0.85f, 0.8f), 2f);
+
+        if (sprHudMinimap != null)
         {
-            RawImage ri = hudBG.AddComponent<RawImage>();
-            // Ambil 60% kiri gambar HUD (portrait + HP/MP)
-            ri.texture = texHUD;
-            ri.uvRect = new Rect(0f, 0f, 0.60f, 1f);
-            ri.color = Color.white;
+            GameObject mBg = new GameObject("MinimapBGImg");
+            mBg.transform.SetParent(minimapCard.transform, false);
+            Image mImg = mBg.AddComponent<Image>();
+            mImg.sprite = sprHudMinimap;
+            mImg.preserveAspect = true;
+            mBg.GetComponent<RectTransform>().sizeDelta = new Vector2(130f, 100f);
+        }
+
+        // Marker Posisi Pemain (Diamond Putih Berkedip)
+        GameObject markerGO = CreateUIBox("PlayerMinimapDiamond", minimapCard.transform,
+            new Vector2(10f, 10f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            Color.white);
+        markerGO.transform.rotation = Quaternion.Euler(0, 0, 45f);
+        minimapPlayerMarker = markerGO.GetComponent<RectTransform>();
+
+        // -------------------------------------------------------------
+        // C. PANEL KANAN BAWAH: TOMBOL AKSI MELINGKAR (GAMBAR 2)
+        // -------------------------------------------------------------
+        // 1. Tombol Serang Utama (Pedang Besar)
+        CreateActionCircleButton("Btn_Attack", canvasGO.transform,
+            new Vector2(-110f, 110f), 105f, sprBtnAttack, "><", "[J/Space]", () => PerformBasicAttack());
+
+        // 2. Tiga Tombol Skill dalam Lengkungan
+        CreateActionCircleButton("Btn_Skill1", canvasGO.transform,
+            new Vector2(-215f, 75f), 74f, sprBtnSkill1, "~", "[K/1]", () => PerformSkill1());
+
+        CreateActionCircleButton("Btn_Skill2", canvasGO.transform,
+            new Vector2(-195f, 175f), 74f, sprBtnSkill2, "*", "[L/2]", () => PerformSkill2());
+
+        CreateActionCircleButton("Btn_Skill3", canvasGO.transform,
+            new Vector2(-105f, 235f), 74f, sprBtnSkill3, "!", "[I/3]", () => PerformSkill3());
+
+        // -------------------------------------------------------------
+        // D. TEKS GELOMBANG & SKOR (ATAS TENGAH)
+        // -------------------------------------------------------------
+        waveValueText = CreateUIText("WaveLabel", canvasGO.transform, "GELOMBANG 1",
+            new Vector2(360f, 36f), new Vector2(0.5f, 1f), new Vector2(0f, -22f),
+            18f, new Color(0.9f, 0.8f, 1.0f, 0.95f), TextAlignmentOptions.Center);
+
+        scoreValueText = CreateUIText("ScoreLabel", canvasGO.transform, "Skor: 0",
+            new Vector2(250f, 30f), new Vector2(0.5f, 1f), new Vector2(0f, -54f),
+            14f, C_GOLD, TextAlignmentOptions.Center);
+
+        // -------------------------------------------------------------
+        // E. HINT KONTROL BAWAH TENGAH
+        // -------------------------------------------------------------
+        GameObject hintBox = CreateUIBox("ControlHint", canvasGO.transform,
+            new Vector2(720f, 32f), new Vector2(0.5f, 0f), new Vector2(0f, 16f),
+            new Color(0.04f, 0.02f, 0.10f, 0.78f));
+        CreateUIText("HintText", hintBox.transform,
+            "[WASD / Panah] Gerak Bebas  |  [J / Space] Serang  |  [K / L / I] Skill  |  [ESC] Jeda",
+            new Vector2(710f, 28f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            11f, new Color(0.85f, 0.85f, 0.95f, 0.9f), TextAlignmentOptions.Center);
+    }
+
+    void CreateActionCircleButton(string name, Transform parent, Vector2 pos, float size,
+        Sprite iconSpr, string fallbackIco, string keyHint, System.Action onClick)
+    {
+        GameObject btnGO = new GameObject(name);
+        btnGO.transform.SetParent(parent, false);
+
+        RectTransform rt = btnGO.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(1f, 0f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(size, size);
+
+        // Latar tombol lingkaran
+        Image bgImg = btnGO.AddComponent<Image>();
+        bgImg.color = new Color(0.10f, 0.05f, 0.22f, 0.95f);
+        CreateUIBorder(btnGO, C_PURPLE_FX, 2.5f);
+
+        // Icon tombol
+        if (iconSpr != null)
+        {
+            GameObject icoGO = new GameObject("Icon");
+            icoGO.transform.SetParent(btnGO.transform, false);
+            Image icoImg = icoGO.AddComponent<Image>();
+            icoImg.sprite = iconSpr;
+            icoImg.preserveAspect = true;
+            icoGO.GetComponent<RectTransform>().sizeDelta = new Vector2(size * 0.7f, size * 0.7f);
         }
         else
         {
-            Image img = hudBG.AddComponent<Image>();
-            img.color = COL_PANEL;
+            CreateUIText("FallbackIco", btnGO.transform, fallbackIco,
+                new Vector2(size, size), new Vector2(0.5f, 0.5f), Vector2.zero,
+                size * 0.35f, Color.white, TextAlignmentOptions.Center);
         }
 
-        // Overlay teks HP/MP agar selalu akurat
-        hpText = MakeText("HP_Val", canvasObj.transform,
-            "HP " + hpCur + "/" + hpMax,
-            new Vector2(160, 26), new Vector2(0, 1), new Vector2(0, 1),
-            new Vector2(165, -42), 13f, Color.white, TextAlignmentOptions.Left);
+        // Teks petunjuk tombol di bawah
+        CreateUIText("KeyHint", btnGO.transform, keyHint,
+            new Vector2(size + 20f, 18f), new Vector2(0.5f, 0f), new Vector2(0f, -14f),
+            9.5f, C_GOLD, TextAlignmentOptions.Center);
 
-        mpText = MakeText("MP_Val", canvasObj.transform,
-            "MP " + mpCur + "/" + mpMax,
-            new Vector2(160, 26), new Vector2(0, 1), new Vector2(0, 1),
-            new Vector2(165, -72), 13f, Color.white, TextAlignmentOptions.Left);
-
-        // ===== SKILL BUTTONS — render bagian kanan dari hud_ui =====
-        if (texHUD != null)
-        {
-            GameObject skillBG = MakeRawUIImg("SkillBG", canvasObj.transform,
-                new Vector2(290, 110), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-10, -10));
-            RawImage ri = skillBG.AddComponent<RawImage>();
-            ri.texture = texHUD;
-            ri.uvRect = new Rect(0.40f, 0f, 0.60f, 1f); // bagian kanan HUD = skill buttons
-            ri.color = Color.white;
-        }
-
-        // Label tombol skill
-        string[] labels = { "[A] Tebas", "[S] Badai", "[W] Lompat" };
-        for (int i = 0; i < 3; i++)
-        {
-            MakeText("SkillLbl" + i, canvasObj.transform, labels[i],
-                new Vector2(90, 22), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-130 + i * 95f, -120), 9.5f,
-                new Color(0.9f, 0.9f, 1f, 0.9f), TextAlignmentOptions.Center);
-        }
-
-        // ===== WAVE & SCORE =====
-        waveLabel = MakeText("WaveLbl", canvasObj.transform, "GELOMBANG 1",
-            new Vector2(300, 36), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0, -12), 16f, new Color(0.85f, 0.75f, 1f, 0.9f), TextAlignmentOptions.Center);
-
-        scoreText = MakeText("ScoreLbl", canvasObj.transform, "Skor: 0",
-            new Vector2(200, 30), new Vector2(1, 1), new Vector2(1, 1),
-            new Vector2(-10, -50), 13f, COL_GOLD, TextAlignmentOptions.Right);
-
-        // ===== HINT BAWAH =====
-        GameObject hint = MakeRawUIImg("HintBG", canvasObj.transform,
-            new Vector2(680, 34), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0, 8));
-        Image hintImg = hint.AddComponent<Image>();
-        hintImg.color = new Color(0.03f, 0.01f, 0.08f, 0.75f);
-        MakeText("HintTxt", hint.transform,
-            "[Panah] Gerak  [Spasi/W] Lompat  [A] Tebas  [S] Skill  [ESC] Jeda",
-            new Vector2(670, 30), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            Vector2.zero, 10.5f, new Color(0.75f, 0.75f, 0.9f, 0.9f), TextAlignmentOptions.Center);
+        // Tombol Interaktif
+        Button btn = btnGO.AddComponent<Button>();
+        btn.onClick.AddListener(() => onClick?.Invoke());
     }
 
-    // ================================================================
-    // PAUSE & GAME OVER
-    // ================================================================
-    void BuildPausePanel()
+    // =========================================================================
+    // 7. MENU JEDA & GAME OVER
+    // =========================================================================
+    void BuildPauseMenu()
     {
         GameObject c = GameObject.Find("HUD_Canvas");
         if (!c) return;
-        pausePanel = MakePanel("PausePanel", c.transform,
-            new Vector2(380, 320), new Vector2(0.5f, 0.5f), Vector2.zero);
 
-        MakeText("PT", pausePanel.transform, "- JEDA -",
-            new Vector2(360, 50), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0, -20), 28f, COL_GOLD, TextAlignmentOptions.Center);
+        pauseMenuObj = CreateUIBox("PauseMenuModal", c.transform,
+            new Vector2(400f, 320f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            C_PANEL);
+        CreateUIBorder(pauseMenuObj, C_GOLD, 2f);
 
-        MakeMenuBtn("BtnResume", pausePanel.transform, "Lanjutkan [ESC]",
-            new Vector2(0, -100), () => TogglePause());
-        MakeMenuBtn("BtnQuit", pausePanel.transform, "Menu Utama",
-            new Vector2(0, -165), () => GoMainMenu());
-        pausePanel.SetActive(false);
+        CreateUIText("PauseTitle", pauseMenuObj.transform, "- JEDA -",
+            new Vector2(360f, 50f), new Vector2(0.5f, 1f), new Vector2(0f, -24f),
+            28f, C_GOLD, TextAlignmentOptions.Center);
+
+        CreateModalButton("BtnResume", pauseMenuObj.transform, "Lanjutkan [ESC]",
+            new Vector2(0f, -100f), () => TogglePause());
+
+        CreateModalButton("BtnMenu", pauseMenuObj.transform, "Menu Utama",
+            new Vector2(0f, -170f), () => ExitToMainMenu());
+
+        pauseMenuObj.SetActive(false);
     }
 
-    void BuildGameOverPanel()
+    void BuildGameOverMenu()
     {
         GameObject c = GameObject.Find("HUD_Canvas");
         if (!c) return;
-        gameOverPanel = MakePanel("GOPanel", c.transform,
-            new Vector2(480, 400), new Vector2(0.5f, 0.5f), Vector2.zero);
 
-        MakeText("GOT", gameOverPanel.transform, "GUGUR",
-            new Vector2(460, 70), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0, -25), 44f, new Color(0.95f, 0.15f, 0.15f, 1f), TextAlignmentOptions.Center);
+        gameOverMenuObj = CreateUIBox("GameOverModal", c.transform,
+            new Vector2(480f, 390f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            new Color(0.08f, 0.02f, 0.05f, 0.98f));
+        CreateUIBorder(gameOverMenuObj, new Color(0.85f, 0.15f, 0.15f, 1f), 3f);
 
-        MakeText("GOS", gameOverPanel.transform,
-            "\"Dunia tidak akan berhenti\nhanya karena kau terjatuh...\"",
-            new Vector2(450, 80), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0, -110), 14f, new Color(0.75f, 0.65f, 0.9f, 0.9f), TextAlignmentOptions.Center);
+        CreateUIText("GOTitle", gameOverMenuObj.transform, "GUGUR",
+            new Vector2(440f, 65f), new Vector2(0.5f, 1f), new Vector2(0f, -25f),
+            46f, new Color(0.95f, 0.2f, 0.2f, 1f), TextAlignmentOptions.Center);
 
-        MakeMenuBtn("BtnRetry", gameOverPanel.transform, "Coba Lagi",
-            new Vector2(0, -210), () => { Time.timeScale = 1f; SceneManager.LoadScene(SceneManager.GetActiveScene().name); });
-        MakeMenuBtn("BtnMenu2", gameOverPanel.transform, "Menu Utama",
-            new Vector2(0, -278), () => GoMainMenu());
-        gameOverPanel.SetActive(false);
+        CreateUIText("GOSub", gameOverMenuObj.transform,
+            "\"Selama aku masih hidup,\naku tidak akan menyerah.\"",
+            new Vector2(440f, 75f), new Vector2(0.5f, 1f), new Vector2(0f, -105f),
+            14f, new Color(0.85f, 0.75f, 0.95f, 0.95f), TextAlignmentOptions.Center);
+
+        CreateModalButton("BtnRetry", gameOverMenuObj.transform, "Coba Lagi",
+            new Vector2(0f, -205f), () => RestartScene());
+
+        CreateModalButton("BtnExit", gameOverMenuObj.transform, "Menu Utama",
+            new Vector2(0f, -275f), () => ExitToMainMenu());
+
+        gameOverMenuObj.SetActive(false);
     }
 
-    // ================================================================
-    // WAVE SPAWNER MUSUH
-    // ================================================================
-    IEnumerator WaveSpawner()
+    void CreateModalButton(string name, Transform parent, string label, Vector2 pos, System.Action onClick)
     {
-        yield return new WaitForSeconds(3f);
-        while (!gameOver)
-        {
-            waveCount++;
-            if (waveLabel != null) waveLabel.text = "GELOMBANG " + waveCount;
-            int count = 2 + waveCount;
-            for (int i = 0; i < count; i++)
-            {
-                SpawnEnemy();
-                yield return new WaitForSeconds(1.4f);
-            }
-            yield return new WaitForSeconds(waveDelay);
-        }
+        GameObject btnGO = CreateUIBox(name, parent, new Vector2(260f, 48f),
+            new Vector2(0.5f, 0.5f), pos, new Color(0.14f, 0.08f, 0.26f, 1f));
+        CreateUIBorder(btnGO, C_GOLD, 1.5f);
+
+        CreateUIText(name + "_Txt", btnGO.transform, label,
+            new Vector2(250f, 44f), new Vector2(0.5f, 0.5f), Vector2.zero,
+            14f, Color.white, TextAlignmentOptions.Center);
+
+        Button btn = btnGO.AddComponent<Button>();
+        btn.onClick.AddListener(() => onClick?.Invoke());
     }
 
-    void SpawnEnemy()
-    {
-        float side  = Random.value > 0.5f ? 1f : -1f;
-        float spawnX = side * (11f + Random.Range(0f, 5f));
-
-        GameObject e = new GameObject("GraveWalker");
-        e.transform.position = new Vector3(spawnX, groundY + 0.5f, 0);
-        e.tag   = "Enemy";
-        e.layer = 7;
-
-        SpriteRenderer sr = e.AddComponent<SpriteRenderer>();
-        // Pakai frame Hurt Aether sebagai placeholder musuh (terbalik warna)
-        if (aetherFrames != null && aetherFrames.Length > 30)
-            sr.sprite = aetherFrames[30];
-        else
-            sr.sprite = MakeSolidSprite(new Color(0.35f, 0.05f, 0.55f, 1f));
-        sr.color = new Color(0.80f, 0.30f, 1.0f, 1f); // tint ungu
-        sr.sortingOrder = 10;
-        e.transform.localScale = new Vector3(-1.0f, 1.0f, 1f); // flip
-
-        Rigidbody2D rb = e.AddComponent<Rigidbody2D>();
-        rb.freezeRotation = true;
-        rb.gravityScale   = 4f;
-
-        CapsuleCollider2D cc = e.AddComponent<CapsuleCollider2D>();
-        cc.size = new Vector2(0.6f, 1.0f);
-
-        GraveWalkerAI ai = e.AddComponent<GraveWalkerAI>();
-        ai.Init(player, this, aetherFrames);
-
-        enemies.Add(e);
-    }
-
-    // ================================================================
-    // INTRO FADE
-    // ================================================================
-    IEnumerator IntroFade()
-    {
-        GameObject c = GameObject.Find("HUD_Canvas");
-        if (!c) yield break;
-        TMP_Text t = MakeText("Intro", c.transform,
-            "Dunia ini adalah makam...\ndan kau adalah satu-satunya yang masih berjalan.",
-            new Vector2(800, 100), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0, 80), 18f, new Color(0.8f, 0.7f, 1f, 0f), TextAlignmentOptions.Center);
-
-        for (float f = 0f; f < 1f; f += Time.deltaTime * 0.5f) { t.color = new Color(0.8f, 0.7f, 1f, f); yield return null; }
-        yield return new WaitForSeconds(3.5f);
-        for (float f = 1f; f > 0f; f -= Time.deltaTime * 0.8f) { t.color = new Color(0.8f, 0.7f, 1f, f); yield return null; }
-        Destroy(t.gameObject);
-    }
-
-    // ================================================================
-    // PUBLIC — dipanggil dari AI musuh
-    // ================================================================
+    // =========================================================================
+    // 8. LOGIKA GAMEPLAY & DAMAGE
+    // =========================================================================
     public void PlayerTakeDamage(int dmg)
     {
-        if (invincibleTimer > 0f || gameOver) return;
+        if (invincibilityTimer > 0f || isDead) return;
+
         hpCur = Mathf.Max(0, hpCur - dmg);
-        invincibleTimer = 1.0f;
-        RefreshHUD();
-        if (hpCur <= 0) TriggerGameOver();
+        invincibilityTimer = 0.8f;
+        UpdateHUDValues();
+
+        // Flash merah & pose hurt
+        if (playerSR != null)
+        {
+            StartCoroutine(PlayerHurtRoutine());
+        }
+
+        if (hpCur <= 0)
+        {
+            TriggerGameOver();
+        }
     }
 
-    public void EnemyKilled()
+    IEnumerator PlayerHurtRoutine()
     {
-        score += 100;
-        mpCur = Mathf.Min(mpMax, mpCur + 5);
-        RefreshHUD();
-        if (scoreText != null) scoreText.text = "Skor: " + score;
+        if (sprAetherHurt != null) playerSR.sprite = sprAetherHurt;
+        playerSR.color = new Color(1f, 0.4f, 0.4f, 1f);
+
+        yield return new WaitForSeconds(0.18f);
+
+        playerSR.color = Color.white;
+        if (!isAttacking && !isDead) playerSR.sprite = sprAetherIdle;
     }
 
-    // ================================================================
-    // HELPER LOGIKA
-    // ================================================================
-    void RefreshHUD()
+    public void OnEnemyKilled(int points)
     {
-        if (hpText != null) hpText.text = "HP " + hpCur + "/" + hpMax;
-        if (mpText != null) mpText.text = "MP " + mpCur + "/" + mpMax;
+        score += points;
+        mpCur = Mathf.Min(mpMax, mpCur + 8);
+        UpdateHUDValues();
+    }
+
+    void UpdateHUDValues()
+    {
+        if (hpBarFill != null) hpBarFill.fillAmount = (float)hpCur / hpMax;
+        if (hpValueText != null) hpValueText.text = "HP  " + hpCur + " / " + hpMax;
+
+        if (mpBarFill != null) mpBarFill.fillAmount = (float)mpCur / mpMax;
+        if (mpValueText != null) mpValueText.text = "MP  " + mpCur + " / " + mpMax;
+
+        if (scoreValueText != null) scoreValueText.text = "Skor: " + score;
+        if (waveValueText != null) waveValueText.text = "GELOMBANG " + wave;
+    }
+
+    IEnumerator PassiveManaRegen()
+    {
+        while (!isDead)
+        {
+            yield return new WaitForSeconds(1.5f);
+            if (mpCur < mpMax)
+            {
+                mpCur = Mathf.Min(mpMax, mpCur + 2);
+                UpdateHUDValues();
+            }
+        }
     }
 
     void TriggerGameOver()
     {
-        gameOver = true;
-        SetAnim("die", 32, 4);
-        if (gameOverPanel != null) { gameOverPanel.SetActive(true); }
+        isDead = true;
+        if (sprAetherDie != null && playerSR != null) playerSR.sprite = sprAetherDie;
+        if (gameOverMenuObj != null) gameOverMenuObj.SetActive(true);
     }
 
     void TogglePause()
     {
-        if (gameOver) return;
-        paused = !paused;
-        Time.timeScale = paused ? 0f : 1f;
-        if (pausePanel != null) pausePanel.SetActive(paused);
+        if (isDead) return;
+        isPaused = !isPaused;
+        Time.timeScale = isPaused ? 0f : 1f;
+        if (pauseMenuObj != null) pauseMenuObj.SetActive(isPaused);
     }
 
-    void GoMainMenu() { Time.timeScale = 1f; SceneManager.LoadScene("Main Menu"); }
+    void RestartScene()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
 
-    // ================================================================
-    // HELPER UI
-    // ================================================================
-    GameObject MakePanel(string name, Transform parent, Vector2 size, Vector2 anchor, Vector2 pos)
+    void ExitToMainMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("Main Menu");
+    }
+
+    // =========================================================================
+    // 9. WAVE SPAWNER MUSUH (Demon Guards & Warden)
+    // =========================================================================
+    IEnumerator EnemyWaveRoutine()
+    {
+        yield return new WaitForSeconds(2.5f);
+
+        while (!isDead)
+        {
+            int count = 2 + wave;
+            for (int i = 0; i < count; i++)
+            {
+                SpawnDemonEnemy(i == count - 1 && wave % 2 == 0); // Mini-boss tiap gelombang genap
+                yield return new WaitForSeconds(1.2f);
+            }
+
+            yield return new WaitForSeconds(enemySpawnInterval);
+            wave++;
+            UpdateHUDValues();
+        }
+    }
+
+    void SpawnDemonEnemy(bool isWarden)
+    {
+        // Titik spawn dari reruntuhan luar courtyard
+        Vector2[] spawnPoints = new Vector2[]
+        {
+            new Vector2(-4.5f,  2.2f),
+            new Vector2( 4.5f,  2.2f),
+            new Vector2(-4.5f, -2.2f),
+            new Vector2( 4.5f, -2.2f),
+            new Vector2( 0.0f,  3.2f)
+        };
+
+        Vector2 pt = spawnPoints[Random.Range(0, spawnPoints.Length)];
+
+        GameObject demon = new GameObject(isWarden ? "DemonWarden" : "DemonGuard");
+        demon.transform.position = pt;
+        demon.tag = "Enemy";
+        demon.layer = 7; // Enemy
+
+        SpriteRenderer dsr = demon.AddComponent<SpriteRenderer>();
+        dsr.sprite = isWarden ? (sprDemonWarden ?? sprDemonGuard) : (sprDemonGuard ?? sprDemonWarden);
+        dsr.sortingOrder = 9;
+        demon.transform.localScale = Vector3.one * (isWarden ? 0.75f : 0.55f);
+
+        Rigidbody2D drb = demon.AddComponent<Rigidbody2D>();
+        drb.gravityScale = 0f; // TOP-DOWN
+        drb.freezeRotation = true;
+
+        CircleCollider2D dcc = demon.AddComponent<CircleCollider2D>();
+        dcc.radius = 0.45f;
+
+        DemonCourtyardAI ai = demon.AddComponent<DemonCourtyardAI>();
+        ai.Init(playerObj, this, isWarden ? 120 : 45, isWarden ? 2.0f : 2.6f, isWarden ? 18 : 8);
+
+        activeEnemies.Add(demon);
+    }
+
+    // =========================================================================
+    // HELPER: PEMBUATAN UI PRIMITIF
+    // =========================================================================
+    GameObject CreateUIBox(string name, Transform parent, Vector2 size, Vector2 anchor, Vector2 pos, Color col)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        Image img = go.AddComponent<Image>();
-        img.color = new Color(0.04f, 0.02f, 0.10f, 0.95f);
-        RectTransform rt = go.GetComponent<RectTransform>();
+
+        RectTransform rt = go.AddComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = anchor;
         rt.sizeDelta = size;
         rt.anchoredPosition = pos;
+
+        Image img = go.AddComponent<Image>();
+        img.color = col;
         return go;
     }
 
-    GameObject MakeRawUIImg(string name, Transform parent, Vector2 size, Vector2 aMin, Vector2 aMax, Vector2 pos)
+    TMP_Text CreateUIText(string name, Transform parent, string text, Vector2 size,
+        Vector2 anchor, Vector2 pos, float fontSize, Color col, TextAlignmentOptions align)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
+
         RectTransform rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = aMin; rt.anchorMax = aMax;
-        rt.sizeDelta = size; rt.anchoredPosition = pos;
-        return go;
-    }
+        rt.anchorMin = rt.anchorMax = anchor;
+        rt.sizeDelta = size;
+        rt.anchoredPosition = pos;
 
-    TMP_Text MakeText(string name, Transform parent, string text, Vector2 size,
-        Vector2 aMin, Vector2 aMax, Vector2 pos, float fs, Color col, TextAlignmentOptions align)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent, false);
         TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
-        t.text = text; t.fontSize = fs; t.color = col; t.alignment = align;
-        if (font != null) t.font = font;
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = aMin; rt.anchorMax = aMax;
-        rt.sizeDelta = size; rt.anchoredPosition = pos;
+        t.text = text;
+        t.fontSize = fontSize;
+        t.color = col;
+        t.alignment = align;
+        if (mainFont != null) t.font = mainFont;
         return t;
     }
 
-    void MakeMenuBtn(string name, Transform parent, string label, Vector2 pos, System.Action cb)
+    void CreateUIBorder(GameObject target, Color color, float thickness)
     {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        Image img = go.AddComponent<Image>();
-        img.color = new Color(0.12f, 0.06f, 0.25f, 1f);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(260, 48);
-        rt.anchoredPosition = pos;
-        Button btn = go.AddComponent<Button>();
-        btn.onClick.AddListener(() => cb?.Invoke());
-        MakeText(name + "Txt", go.transform, label,
-            new Vector2(250, 44), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            Vector2.zero, 15f, Color.white, TextAlignmentOptions.Center);
+        Outline outline = target.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = new Vector2(thickness, -thickness);
     }
 
-    // ================================================================
-    // HELPER SPRITE PRIMITIF (fallback)
-    // ================================================================
-    Sprite MakeSolidSprite(Color col)
+    // =========================================================================
+    // HELPER: PROSEDURAL SPRITES (SABIT, ORB, QUAD)
+    // =========================================================================
+    Sprite MakeCrescentSlashSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        float rOuter = size * 0.48f;
+        float rInner = size * 0.32f;
+        Vector2 centerOuter = new Vector2(size * 0.45f, size * 0.5f);
+        Vector2 centerInner = new Vector2(size * 0.58f, size * 0.5f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x, y);
+                float dOut = Vector2.Distance(p, centerOuter);
+                float dIn  = Vector2.Distance(p, centerInner);
+
+                if (dOut <= rOuter && dIn >= rInner && x > size * 0.25f)
+                {
+                    float alpha = Mathf.Clamp01((rOuter - dOut) / 4f) * Mathf.Clamp01((dIn - rInner) / 4f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+                else
+                {
+                    tex.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    Sprite MakeGlowOrbSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        float center = size / 2f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                float alpha = Mathf.Clamp01(1f - (d / center));
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha * alpha));
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    Sprite MakeSolidQuadSprite(Color c)
     {
         Texture2D t = new Texture2D(4, 4);
-        Color[] px = new Color[16]; for (int i = 0; i < 16; i++) px[i] = col;
-        t.SetPixels(px); t.Apply();
-        return Sprite.Create(t, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
-    }
-
-    Sprite MakeCircleSprite(int res)
-    {
-        Texture2D t = new Texture2D(res, res); t.filterMode = FilterMode.Bilinear;
-        float r = res / 2f;
-        for (int y = 0; y < res; y++)
-            for (int x = 0; x < res; x++)
-            {
-                float d = Mathf.Sqrt((x - r) * (x - r) + (y - r) * (y - r));
-                float a = Mathf.Clamp01(1f - (d - (r - 1.5f)) / 1.5f);
-                t.SetPixel(x, y, new Color(1, 1, 1, a));
-            }
+        Color[] px = new Color[16];
+        for (int i = 0; i < 16; i++) px[i] = c;
+        t.SetPixels(px);
         t.Apply();
-        return Sprite.Create(t, new Rect(0, 0, res, res), new Vector2(0.5f, 0.5f), res);
-    }
-
-    // ================================================================
-    // HELPER WORLD OBJECT
-    // ================================================================
-    GameObject CreateWorld(string name, Vector3 pos, Vector2 size, Color col, int order)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.position = pos;
-        go.transform.localScale = new Vector3(size.x, size.y, 1f);
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = MakeSolidSprite(col); sr.color = col; sr.sortingOrder = order;
-        return go;
-    }
-
-    GameObject CreateCircle(string name, Vector3 pos, float radius, Color col, int order)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.position = pos;
-        go.transform.localScale = Vector3.one * (radius * 2f);
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = MakeCircleSprite(64); sr.color = col; sr.sortingOrder = order;
-        return go;
+        return Sprite.Create(t, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
     }
 }
 
-// ================================================================
-// GraveWalkerAI — AI musuh GraveWalker
-// ================================================================
-public class GraveWalkerAI : MonoBehaviour
+// =============================================================================
+// DemonCourtyardAI — AI Musuh Top-Down Courtyard
+// =============================================================================
+public class DemonCourtyardAI : MonoBehaviour
 {
-    private GameObject target;
+    private GameObject player;
     private GameSceneManager manager;
-    private Sprite[] frames;
     private SpriteRenderer sr;
-    private int hp = 30;
-    private bool dead = false;
-    private float speed;
-    private float attackTimer = 0f;
-    private int animF = 0;
-    private float animT = 0f;
+    private int maxHP;
+    private int currentHP;
+    private float moveSpeed;
+    private int attackDamage;
 
-    public void Init(GameObject player, GameSceneManager mgr, Sprite[] aetherFrames)
+    private float attackCooldown = 1.3f;
+    private float lastAttackTime = -999f;
+    private bool isDead = false;
+
+    public void Init(GameObject targetPlayer, GameSceneManager mgr, int hp, float speed, int dmg)
     {
-        target  = player;
+        player = targetPlayer;
         manager = mgr;
-        frames  = aetherFrames;
-        speed   = Random.Range(1.8f, 3.2f);
-        sr      = GetComponent<SpriteRenderer>();
+        maxHP = currentHP = hp;
+        moveSpeed = speed;
+        attackDamage = dmg;
+        sr = GetComponent<SpriteRenderer>();
     }
 
     void Update()
     {
-        if (dead || target == null) return;
+        if (isDead || player == null) return;
 
-        Vector3 dir = target.transform.position - transform.position;
+        Vector2 dir = (player.transform.position - transform.position);
+        float dist = dir.magnitude;
 
-        // Gerak ke arah player
-        transform.position += new Vector3(Mathf.Sign(dir.x) * speed * Time.deltaTime, 0, 0);
+        // Hadap ke arah player
+        if (dir.x > 0.05f) transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, 1f);
+        else if (dir.x < -0.05f) transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, 1f);
 
-        // Flip
-        transform.localScale = new Vector3(dir.x > 0 ? -1f : 1f, 1f, 1f);
-
-        // Animasi walk (frame baris 0, kol 4-9)
-        animT += Time.deltaTime;
-        if (animT > 0.12f)
+        // Kejar player jika dalam jangkauan
+        if (dist > 0.95f)
         {
-            animT = 0f;
-            animF = (animF + 1) % 6;
-            if (frames != null && frames.Length > 9 && sr != null)
-                sr.sprite = frames[4 + animF];
+            transform.position += (Vector3)(dir.normalized * moveSpeed * Time.deltaTime);
         }
-
-        // Serang jika dekat
-        attackTimer -= Time.deltaTime;
-        if (Mathf.Abs(dir.x) < 1.0f && attackTimer <= 0f)
+        else
         {
-            attackTimer = 1.5f;
-            if (manager != null) manager.PlayerTakeDamage(8);
+            // Serang jika dalam jangkauan dekat
+            if (Time.time >= lastAttackTime + attackCooldown)
+            {
+                lastAttackTime = Time.time;
+                manager.PlayerTakeDamage(attackDamage);
+            }
         }
     }
 
     public void TakeDamage(int dmg)
     {
-        if (dead) return;
-        hp -= dmg;
-        if (sr) sr.color = new Color(1f, 0.3f, 0.3f, 1f);
-        StartCoroutine(ResetColor());
-        if (hp <= 0) Die();
+        if (isDead) return;
+
+        currentHP -= dmg;
+        StartCoroutine(HitFlashRoutine());
+
+        if (currentHP <= 0)
+        {
+            Die();
+        }
     }
 
-    IEnumerator ResetColor()
+    IEnumerator HitFlashRoutine()
     {
+        if (sr != null) sr.color = new Color(1f, 0.3f, 0.3f, 1f);
         yield return new WaitForSeconds(0.12f);
-        if (sr) sr.color = new Color(0.80f, 0.30f, 1.0f, 1f);
+        if (sr != null) sr.color = Color.white;
     }
 
     void Die()
     {
-        dead = true;
-        if (manager != null) manager.EnemyKilled();
-        StartCoroutine(DeathAnim());
+        isDead = true;
+        manager.OnEnemyKilled(100);
+        StartCoroutine(DeathFadeRoutine());
     }
 
-    IEnumerator DeathAnim()
+    IEnumerator DeathFadeRoutine()
     {
-        // Flash merah lalu fade
-        for (float f = 1f; f > 0f; f -= Time.deltaTime * 3f)
+        float timer = 0f;
+        while (timer < 0.35f)
         {
-            if (sr) sr.color = new Color(1f, 0.1f, 0.1f, f);
+            timer += Time.deltaTime;
+            if (sr != null) sr.color = new Color(0.8f, 0.2f, 1.0f, 1f - (timer / 0.35f));
             yield return null;
         }
         Destroy(gameObject);
